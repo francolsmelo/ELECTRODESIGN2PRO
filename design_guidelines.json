@@ -1,0 +1,134 @@
+{
+  "design_system": {
+    "identity": {
+      "name": "ElectroDesign Pro",
+      "vibe": "Technical, Precise, Modular, High-Density",
+      "archetype": "Swiss & High-Contrast (Archetype 4) + Performance Pro (Archetype 2)",
+      "theme_mode": "light",
+      "emotional_tone": "Reliability, Efficiency, Safety"
+    },
+    "typography": {
+      "headings": {
+        "family": "Manrope",
+        "weights": ["600", "700"],
+        "usage": "Page titles, Module headers, Modal titles",
+        "tracking": "-0.02em"
+      },
+      "body": {
+        "family": "Inter",
+        "weights": ["400", "500"],
+        "usage": "UI elements, Navigation, Form labels, General text"
+      },
+      "monospace": {
+        "family": "JetBrains Mono",
+        "weights": ["400", "500"],
+        "usage": "Calculated values, Data tables, Codes (APUs), Coordinates"
+      }
+    },
+    "colors": {
+      "primary": {
+        "name": "Engineering Slate",
+        "value": "#0F172A",
+        "usage": "Primary buttons, Sidebar active state, Headings"
+      },
+      "secondary": {
+        "name": "Electric Sky",
+        "value": "#0EA5E9",
+        "usage": "Active links, Selection states, Primary highlights, Progress bars"
+      },
+      "background": {
+        "main": "#F8FAFC",
+        "card": "#FFFFFF",
+        "sidebar": "#FFFFFF"
+      },
+      "neutral": {
+        "border": "#E2E8F0",
+        "text_primary": "#0F172A",
+        "text_secondary": "#64748B",
+        "text_tertiary": "#94A3B8"
+      },
+      "status": {
+        "success": "#22C55E",
+        "warning": "#F59E0B",
+        "danger": "#EF4444",
+        "info": "#3B82F6"
+      }
+    },
+    "spacing": {
+      "base_scale": 4,
+      "container_padding": "p-6",
+      "section_gap": "gap-6",
+      "component_density": "high",
+      "rules": "Use tighter spacing for data tables (py-2 px-3). Use generous spacing for page containers (p-8)."
+    },
+    "layout": {
+      "structure": "Sidebar Navigation + Top Header + Main Content Area",
+      "grid_system": "Mode B: High Density Grid (12 columns). Widgets span 3-4 columns.",
+      "container_width": "max-w-[1600px] mx-auto",
+      "z_index": {
+        "modal": 50,
+        "header": 40,
+        "sidebar": 30,
+        "dropdown": 20
+      }
+    },
+    "components": {
+      "buttons": {
+        "style": "Sharp corners or small radius (rounded-md). High contrast.",
+        "variants": ["default (Slate 900)", "outline (Border only)", "ghost (Hover only)"]
+      },
+      "cards": {
+        "style": "Flat, 1px Border (Slate-200), No Shadow or very subtle shadow-sm. White background.",
+        "hover": "border-slate-300"
+      },
+      "inputs": {
+        "style": "rounded-md, border-slate-200, bg-white, focus:ring-2 focus:ring-sky-500",
+        "density": "h-9 text-sm"
+      },
+      "tables": {
+        "style": "Dense, striped (optional), sticky header. Monospace font for numerical data.",
+        "header": "bg-slate-50 text-slate-600 font-semibold text-xs uppercase tracking-wider"
+      },
+      "modals": {
+        "style": "Clean white, no glassmorphism distraction. Focus on form data."
+      }
+    },
+    "visual_enhancers": {
+      "grid_borders": "Use 'divide-y' and 'divide-x' utilities to create visible grids in data sections.",
+      "status_indicators": "Use small colored dots (w-2 h-2 rounded-full) next to status text.",
+      "empty_states": "Use technical line illustrations or clean SVG icons.",
+      "shadows": "Minimalist. shadow-sm for active elements only."
+    },
+    "motion": {
+      "duration": "duration-200",
+      "easing": "ease-out",
+      "usage": "Micro-interactions on hover, simple fade-in for page loads. No complex parallax."
+    },
+    "assets": {
+      "icons": "Lucide React (already installed). Use clear, thin strokes.",
+      "images": {
+        "inspection_demo_1": "https://images.unsplash.com/photo-1561247852-1e7c8a1c1c60?auto=format&fit=crop&w=800&q=80",
+        "inspection_demo_2": "https://images.unsplash.com/photo-1762329405670-80854d049f69?auto=format&fit=crop&w=800&q=80",
+        "user_profile_demo": "https://images.unsplash.com/photo-1757697654584-544e1246d796?auto=format&fit=crop&w=200&q=80"
+      }
+    }
+  },
+  "instructions_to_main_agent": [
+    "INSTALL FONTS: Add '@fontsource/manrope', '@fontsource/inter', and '@fontsource/jetbrains-mono' via npm/yarn if possible, or use Google Fonts import in index.css.",
+    "LAYOUT STRATEGY: Build a persistent 'DashboardLayout' component that includes the Sidebar and Header. Wrap all authenticated pages in this.",
+    "DATA DENSITY: For the 'Calculations' and 'Database' pages, minimize padding. Use 'h-8' or 'h-9' for input fields and table rows. Maximize information density.",
+    "DRAWING MODULE: For the Image Inspection/Drawing module, create a canvas wrapper. If using a library, keep the UI overlay absolute positioned on top of the canvas.",
+    "FORMS: Use Shadcn 'Form' components. Break long engineering forms into logical sections with clear headings (e.g., 'Electrical Parameters', 'Transformer Specs').",
+    "TABLES: Use Shadcn 'Table'. Ensure columns align correctly (numbers right-aligned). Add zebra striping for readability in long lists.",
+    "CHARTS: Use Recharts. Style them with the defined color palette (Slate for axes, Sky/Blue/Teal for data series).",
+    "RESPONSIVENESS: Ensure tables have horizontal scroll on mobile. Stack sidebar into a hamburger menu on small screens.",
+    "DARK MODE: The guidelines lean towards Light Mode for technical clarity. If implementing Dark Mode, invert background to Slate-950 and cards to Slate-900."
+  ],
+  "universal_guidelines": [
+    "Do not use gradients for backgrounds. Keep it flat and clean.",
+    "Avoid 'App-logo' spinning animations. This is a professional tool.",
+    "Use 'data-testid' on all buttons, inputs, and major containers.",
+    "Never center text in data tables (except headers if needed). Numbers right, Text left.",
+    "Use 'sonner' for notifications (Success/Error toasts)."
+  ]
+}
