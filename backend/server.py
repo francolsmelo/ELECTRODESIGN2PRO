@@ -242,17 +242,73 @@ async def analyze_inspection(image_base64: str = Form(...), project_id: str = Fo
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error en análisis: {str(e)}")
 
-@api_router.post("/inspection/save-drawing")
-async def save_drawing(inspection_id: str = Form(...), drawings: str = Form(...), current_user: User = Depends(get_current_user)):
+@api_router.post("/inspection/save")
+async def save_inspection(
+    project_id: str = Form(...),
+    image_base64: str = Form(...),
+    drawings: str = Form(...),
+    title: str = Form("Inspección sin título"),
+    current_user: User = Depends(get_current_user)
+):
     import json
     drawings_data = json.loads(drawings)
-    result = await db.inspections.update_one(
-        {"id": inspection_id},
-        {"$set": {"drawings": drawings_data}}
+    
+    inspection = InspectionAnalysis(
+        project_id=project_id,
+        image_data=image_base64,
+        analysis_result={},
+        drawings=drawings_data
     )
-    if result.modified_count == 0:
+    
+    doc = inspection.model_dump()
+    doc["created_at"] = doc["created_at"].isoformat()
+    doc["title"] = title
+    doc["user_id"] = current_user.id
+    
+    await db.inspections.insert_one(doc)
+    
+    return {
+        "success": True,
+        "inspection_id": inspection.id,
+        "message": "Inspección guardada correctamente"
+    }
+
+@api_router.get("/inspection/list/{project_id}")
+async def list_inspections(project_id: str, current_user: User = Depends(get_current_user)):
+    inspections = await db.inspections.find(
+        {"project_id": project_id, "user_id": current_user.id},
+        {"_id": 0, "image_data": 0}
+    ).to_list(100)
+    
+    for inspection in inspections:
+        if isinstance(inspection.get("created_at"), str):
+            inspection["created_at"] = datetime.fromisoformat(inspection["created_at"])
+    
+    return inspections
+
+@api_router.get("/inspection/{inspection_id}")
+async def get_inspection(inspection_id: str, current_user: User = Depends(get_current_user)):
+    inspection = await db.inspections.find_one(
+        {"id": inspection_id, "user_id": current_user.id},
+        {"_id": 0}
+    )
+    
+    if not inspection:
         raise HTTPException(status_code=404, detail="Inspección no encontrada")
-    return {"success": True}
+    
+    if isinstance(inspection.get("created_at"), str):
+        inspection["created_at"] = datetime.fromisoformat(inspection["created_at"])
+    
+    return inspection
+
+@api_router.delete("/inspection/{inspection_id}")
+async def delete_inspection(inspection_id: str, current_user: User = Depends(get_current_user)):
+    result = await db.inspections.delete_one({"id": inspection_id, "user_id": current_user.id})
+    
+    if result.deleted_count == 0:
+        raise HTTPException(status_code=404, detail="Inspección no encontrada")
+    
+    return {"success": True, "message": "Inspección eliminada"}
 
 @api_router.post("/demand/calculate")
 async def calculate_demand(data: Dict[str, Any], current_user: User = Depends(get_current_user)):
