@@ -29,6 +29,8 @@ const InspectionModule = ({ projectId }) => {
   const [analyzing, setAnalyzing] = useState(false);
   const [analysis, setAnalysis] = useState(null);
   const [showAnalysis, setShowAnalysis] = useState(false);
+  const [imageDimensions, setImageDimensions] = useState({ width: 800, height: 600 });
+  const [scale, setScale] = useState(1);
   const stageRef = useRef(null);
   const [backgroundImage] = useImage(imageBase64);
 
@@ -38,6 +40,25 @@ const InspectionModule = ({ projectId }) => {
       setImageFile(file);
       const reader = new FileReader();
       reader.onloadend = () => {
+        const img = new Image();
+        img.onload = () => {
+          // Calcular dimensiones para mantener aspecto pero caber en contenedor
+          const maxWidth = 1200;
+          const maxHeight = 800;
+          let width = img.width;
+          let height = img.height;
+          
+          // Si la imagen es muy grande, escalarla proporcionalmente
+          if (width > maxWidth || height > maxHeight) {
+            const ratio = Math.min(maxWidth / width, maxHeight / height);
+            width = width * ratio;
+            height = height * ratio;
+          }
+          
+          setImageDimensions({ width, height });
+          setScale(1);
+        };
+        img.src = reader.result;
         setImageBase64(reader.result);
       };
       reader.readAsDataURL(file);
@@ -232,21 +253,49 @@ const InspectionModule = ({ projectId }) => {
             </div>
           )}
 
-          <div className="canvas-container" data-testid="drawing-canvas">
+          <div className="mb-4 flex items-center gap-4">
+            <button
+              onClick={() => setScale(Math.max(0.5, scale - 0.1))}
+              className="btn btn-outline"
+              disabled={scale <= 0.5}
+            >
+              Zoom -
+            </button>
+            <span className="text-sm mono" style={{color: 'var(--color-text-secondary)'}}>
+              {Math.round(scale * 100)}%
+            </span>
+            <button
+              onClick={() => setScale(Math.min(2, scale + 0.1))}
+              className="btn btn-outline"
+              disabled={scale >= 2}
+            >
+              Zoom +
+            </button>
+            <button
+              onClick={() => setScale(1)}
+              className="btn btn-outline"
+            >
+              Restablecer
+            </button>
+          </div>
+
+          <div className="canvas-container" data-testid="drawing-canvas" style={{overflow: 'auto', maxHeight: '800px'}}>
             <Stage
-              width={800}
-              height={600}
+              width={imageDimensions.width * scale}
+              height={imageDimensions.height * scale}
               ref={stageRef}
               onMouseDown={handleMouseDown}
               onMouseMove={handleMouseMove}
               onMouseUp={handleMouseUp}
+              scaleX={scale}
+              scaleY={scale}
             >
               <Layer>
                 {backgroundImage && (
                   <KonvaImage
                     image={backgroundImage}
-                    width={800}
-                    height={600}
+                    width={imageDimensions.width}
+                    height={imageDimensions.height}
                   />
                 )}
                 {drawings.map((drawing) => {
@@ -256,7 +305,7 @@ const InspectionModule = ({ projectId }) => {
                         key={drawing.id}
                         points={drawing.points}
                         stroke="#0EA5E9"
-                        strokeWidth={3}
+                        strokeWidth={3 / scale}
                         tension={0.5}
                         lineCap="round"
                         lineJoin="round"
@@ -268,19 +317,19 @@ const InspectionModule = ({ projectId }) => {
                         <Circle
                           x={drawing.x}
                           y={drawing.y}
-                          radius={12}
+                          radius={12 / scale}
                           fill="#EF4444"
                           stroke="#B91C1C"
-                          strokeWidth={2}
+                          strokeWidth={2 / scale}
                         />
                         <Text
-                          x={drawing.x - 50}
-                          y={drawing.y + 20}
+                          x={drawing.x - 50 / scale}
+                          y={drawing.y + 20 / scale}
                           text={drawing.markerType}
-                          fontSize={12}
+                          fontSize={12 / scale}
                           fontFamily="Inter"
                           fill="#0F172A"
-                          padding={4}
+                          padding={4 / scale}
                           backgroundColor="#FFFFFF"
                         />
                       </React.Fragment>
@@ -295,7 +344,8 @@ const InspectionModule = ({ projectId }) => {
           <div className="mt-4">
             <p className="text-sm" style={{color: 'var(--color-text-secondary)'}}>
               • <strong>Dibujo Libre:</strong> Representa cables y conexiones eléctricas<br/>
-              • <strong>Marcadores:</strong> Identifica equipos y elementos eléctricos específicos
+              • <strong>Marcadores:</strong> Identifica equipos y elementos eléctricos específicos<br/>
+              • <strong>Zoom:</strong> Usa los controles de zoom para ajustar la vista de la imagen
             </p>
           </div>
         </div>
