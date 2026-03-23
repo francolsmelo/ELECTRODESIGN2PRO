@@ -10,6 +10,12 @@ const DrawingTools = {
   MARKER: 'marker'
 };
 
+const LineTypes = {
+  MT: { name: 'Media Tensión', color: '#EF4444' }, // Rojo
+  BT: { name: 'Baja Tensión', color: '#22C55E' },  // Verde
+  TIERRA: { name: 'Neutro/Tierra', color: '#EAB308' } // Amarillo
+};
+
 const MarkerTypes = {
   TRANSFORMER: 'Transformador',
   METER: 'Medidor',
@@ -20,9 +26,11 @@ const MarkerTypes = {
 };
 
 const InspectionModule = ({ projectId }) => {
-  const [imageFile, setImageFile] = useState(null);
+  const [imageFiles, setImageFiles] = useState([]);
+  const [currentImageIndex, setCurrentImageIndex] = useState(0);
   const [imageBase64, setImageBase64] = useState(null);
   const [tool, setTool] = useState(DrawingTools.LINE);
+  const [lineType, setLineType] = useState('MT');
   const [markerType, setMarkerType] = useState(MarkerTypes.TRANSFORMER);
   const [drawings, setDrawings] = useState([]);
   const [isDrawing, setIsDrawing] = useState(false);
@@ -61,9 +69,18 @@ const InspectionModule = ({ projectId }) => {
   };
 
   const handleImageUpload = (e) => {
-    const file = e.target.files[0];
-    if (file) {
-      setImageFile(file);
+    const files = Array.from(e.target.files);
+    if (files.length > 0) {
+      setImageFiles(files);
+      setCurrentImageIndex(0);
+      loadImageAtIndex(files, 0);
+      toast.success(`${files.length} imagen(es) cargadas. Trabaja en cada una y guárdalas.`);
+    }
+  };
+
+  const loadImageAtIndex = (files, index) => {
+    if (index >= 0 && index < files.length) {
+      const file = files[index];
       const reader = new FileReader();
       reader.onloadend = () => {
         const img = new Image();
@@ -88,6 +105,23 @@ const InspectionModule = ({ projectId }) => {
       reader.readAsDataURL(file);
       setDrawings([]);
       setAnalysis(null);
+      setInspectionTitle(`Inspección ${index + 1} de ${files.length} - ${file.name}`);
+    }
+  };
+
+  const handleNextImage = () => {
+    if (currentImageIndex < imageFiles.length - 1) {
+      const nextIndex = currentImageIndex + 1;
+      setCurrentImageIndex(nextIndex);
+      loadImageAtIndex(imageFiles, nextIndex);
+    }
+  };
+
+  const handlePrevImage = () => {
+    if (currentImageIndex > 0) {
+      const prevIndex = currentImageIndex - 1;
+      setCurrentImageIndex(prevIndex);
+      loadImageAtIndex(imageFiles, prevIndex);
     }
   };
 
@@ -109,6 +143,8 @@ const InspectionModule = ({ projectId }) => {
       setIsDrawing(true);
       const newLine = {
         type: 'line',
+        lineType: lineType,
+        color: LineTypes[lineType].color,
         points: [adjustedX, adjustedY],
         id: Date.now()
       };
@@ -279,7 +315,8 @@ const InspectionModule = ({ projectId }) => {
 
   const handleNewInspection = () => {
     setImageBase64(null);
-    setImageFile(null);
+    setImageFiles([]);
+    setCurrentImageIndex(0);
     setDrawings([]);
     setInspectionTitle('');
     setCurrentInspectionId(null);
@@ -381,16 +418,35 @@ const InspectionModule = ({ projectId }) => {
           <div className="flex gap-2 mb-4">
             <label className="btn btn-primary cursor-pointer" data-testid="upload-image-button">
               <Upload className="w-4 h-4 inline mr-2" />
-              Cargar Imagen
+              Cargar Imágenes (múltiples)
               <input
                 type="file"
                 accept="image/*"
+                multiple
                 onChange={handleImageUpload}
                 className="hidden"
               />
             </label>
-            {imageFile && (
-              <span className="flex items-center text-sm px-3" style={{color: 'var(--color-text-secondary)'}}>{imageFile.name}</span>
+            {imageFiles.length > 0 && (
+              <div className="flex items-center gap-2">
+                <span className="text-sm px-3" style={{color: 'var(--color-text-secondary)'}}>
+                  {imageFiles.length} imagen(es) | Actual: {currentImageIndex + 1}
+                </span>
+                <button
+                  onClick={handlePrevImage}
+                  disabled={currentImageIndex === 0}
+                  className="btn btn-outline btn-sm"
+                >
+                  ← Anterior
+                </button>
+                <button
+                  onClick={handleNextImage}
+                  disabled={currentImageIndex === imageFiles.length - 1}
+                  className="btn btn-outline btn-sm"
+                >
+                  Siguiente →
+                </button>
+              </div>
             )}
           </div>
 
@@ -467,6 +523,30 @@ const InspectionModule = ({ projectId }) => {
               </button>
             </div>
 
+            {tool === DrawingTools.LINE && (
+              <div className="mb-4">
+                <label className="block text-sm font-medium mb-2" style={{color: 'var(--color-text-secondary)'}}>
+                  Tipo de Línea:
+                </label>
+                <div className="flex gap-2">
+                  {Object.entries(LineTypes).map(([key, value]) => (
+                    <button
+                      key={key}
+                      onClick={() => setLineType(key)}
+                      className={`btn ${lineType === key ? 'btn-primary' : 'btn-outline'}`}
+                      style={lineType === key ? {backgroundColor: value.color, borderColor: value.color} : {}}
+                    >
+                      <div 
+                        className="w-4 h-4 rounded-full mr-2 inline-block"
+                        style={{backgroundColor: value.color}}
+                      />
+                      {value.name}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+
             {tool === DrawingTools.MARKER && (
               <div className="mb-4">
                 <label className="block text-sm font-medium mb-2" style={{color: 'var(--color-text-secondary)'}}>
@@ -537,7 +617,7 @@ const InspectionModule = ({ projectId }) => {
                         <Line
                           key={drawing.id}
                           points={drawing.points}
-                          stroke="#0EA5E9"
+                          stroke={drawing.color || '#0EA5E9'}
                           strokeWidth={3 / scale}
                           tension={0.5}
                           lineCap="round"

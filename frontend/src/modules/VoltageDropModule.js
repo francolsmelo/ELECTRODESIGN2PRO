@@ -1,44 +1,68 @@
 import React, { useState } from 'react';
 import { API } from '../App';
 import { toast } from 'sonner';
-import { Plus, Trash2, TrendingDown, CheckCircle, XCircle } from 'lucide-react';
+import { Plus, Trash2, TrendingDown, CheckCircle, XCircle, Upload } from 'lucide-react';
 
 const VoltageDropModule = ({ projectId }) => {
-  const [circuitType, setCircuitType] = useState('BT');
-  const [limit, setLimit] = useState(3.0);
-  const [segments, setSegments] = useState([
+  const [limitBT, setLimitBT] = useState(3.0);
+  const [limitMT, setLimitMT] = useState(5.0);
+  const [segmentsBT, setSegmentsBT] = useState([
     { id: 1, ref: '1', length: 0, clients: 0, kva: 0, conductors: 3, conductor_size: '2/0 AWG', fcv: 1.0 }
   ]);
-  const [result, setResult] = useState(null);
+  const [segmentsMT, setSegmentsMT] = useState([
+    { id: 1, ref: '1', length: 0, transformers: 0, kva: 0, conductors: 3, conductor_size: 'ACSR 2', fcv: 1.0 }
+  ]);
+  const [resultBT, setResultBT] = useState(null);
+  const [resultMT, setResultMT] = useState(null);
   const [calculating, setCalculating] = useState(false);
 
-  const addSegment = () => {
-    setSegments([...segments, {
-      id: Date.now(),
-      ref: `${segments.length + 1}`,
-      length: 0,
-      clients: 0,
-      kva: 0,
-      conductors: 3,
-      conductor_size: '',
-      fcv: 1.0
-    }]);
+  const addSegment = (type) => {
+    if (type === 'BT') {
+      setSegmentsBT([...segmentsBT, {
+        id: Date.now(),
+        ref: `${segmentsBT.length + 1}`,
+        length: 0,
+        clients: 0,
+        kva: 0,
+        conductors: 3,
+        conductor_size: '',
+        fcv: 1.0
+      }]);
+    } else {
+      setSegmentsMT([...segmentsMT, {
+        id: Date.now(),
+        ref: `${segmentsMT.length + 1}`,
+        length: 0,
+        transformers: 0,
+        kva: 0,
+        conductors: 3,
+        conductor_size: '',
+        fcv: 1.0
+      }]);
+    }
   };
 
-  const updateSegment = (id, field, value) => {
-    setSegments(segments.map(seg =>
+  const updateSegment = (type, id, field, value) => {
+    const setter = type === 'BT' ? setSegmentsBT : setSegmentsMT;
+    const segments = type === 'BT' ? segmentsBT : segmentsMT;
+    setter(segments.map(seg =>
       seg.id === id ? { ...seg, [field]: value } : seg
     ));
   };
 
-  const removeSegment = (id) => {
+  const removeSegment = (type, id) => {
+    const setter = type === 'BT' ? setSegmentsBT : setSegmentsMT;
+    const segments = type === 'BT' ? segmentsBT : segmentsMT;
     if (segments.length > 1) {
-      setSegments(segments.filter(seg => seg.id !== id));
+      setter(segments.filter(seg => seg.id !== id));
     }
   };
 
-  const handleCalculate = async () => {
+  const handleCalculate = async (circuitType) => {
     setCalculating(true);
+    const segments = circuitType === 'BT' ? segmentsBT : segmentsMT;
+    const limit = circuitType === 'BT' ? limitBT : limitMT;
+    
     try {
       const token = localStorage.getItem('token');
       const response = await fetch(`${API}/voltage-drop/calculate`, {
@@ -57,8 +81,12 @@ const VoltageDropModule = ({ projectId }) => {
 
       if (response.ok) {
         const data = await response.json();
-        setResult(data);
-        toast.success('Cálculo completado');
+        if (circuitType === 'BT') {
+          setResultBT(data);
+        } else {
+          setResultMT(data);
+        }
+        toast.success(`Cálculo ${circuitType} completado`);
       } else {
         toast.error('Error al calcular');
       }
