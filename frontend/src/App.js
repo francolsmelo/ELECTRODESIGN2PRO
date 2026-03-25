@@ -7,6 +7,8 @@ import Login from './pages/Login';
 import Register from './pages/Register';
 import Dashboard from './pages/Dashboard';
 import ProjectView from './pages/ProjectView';
+import Plans from './pages/Plans';
+import AdminPanel from './pages/AdminPanel';
 
 const BACKEND_URL = process.env.REACT_APP_BACKEND_URL;
 export const API = `${BACKEND_URL}/api`;
@@ -49,6 +51,8 @@ function App() {
           <Route path="/register" element={!user ? <Register /> : <Navigate to="/dashboard" />} />
           <Route path="/dashboard" element={user ? <Dashboard /> : <Navigate to="/login" />} />
           <Route path="/project/:projectId" element={user ? <ProjectView /> : <Navigate to="/login" />} />
+          <Route path="/plans" element={user ? <Plans /> : <Navigate to="/login" />} />
+          <Route path="/admin" element={user?.role === 'admin' ? <AdminPanel /> : <Navigate to="/dashboard" />} />
           <Route path="/" element={<Navigate to={user ? "/dashboard" : "/login"} />} />
         </Routes>
         <Toaster position="top-right" />

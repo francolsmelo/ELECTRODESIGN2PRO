@@ -2,7 +2,7 @@ import React, { useState, useEffect, useContext } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { AuthContext, API } from '../App';
 import { toast } from 'sonner';
-import { Plus, FolderOpen, LogOut, Zap, MapPin, Cpu, Trash2 } from 'lucide-react';
+import { Plus, FolderOpen, LogOut, Zap, MapPin, Cpu, Trash2, Shield, CreditCard } from 'lucide-react';
 
 const Dashboard = () => {
   const [projects, setProjects] = useState([]);
@@ -139,6 +139,28 @@ const Dashboard = () => {
             <Plus className="w-4 h-4 mr-2 inline" />
             Nuevo Proyecto
           </button>
+          
+          {user?.role === 'admin' && (
+            <button
+              onClick={() => navigate('/admin')}
+              className="btn btn-outline w-full mb-4"
+              data-testid="admin-panel-button"
+            >
+              <Shield className="w-4 h-4 mr-2 inline" />
+              Panel Admin
+            </button>
+          )}
+          
+          {user?.role !== 'admin' && (
+            <button
+              onClick={() => navigate('/plans')}
+              className="btn btn-outline w-full mb-4"
+              data-testid="plans-button"
+            >
+              <CreditCard className="w-4 h-4 mr-2 inline" />
+              Ver Planes
+            </button>
+          )}
           
           <button
             onClick={handleLogout}

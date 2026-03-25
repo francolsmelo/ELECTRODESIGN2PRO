@@ -14,6 +14,8 @@ import jwt
 import bcrypt
 import base64
 from emergentintegrations.llm.chat import LlmChat, UserMessage, ImageContent
+import secrets
+import hashlib
 
 ROOT_DIR = Path(__file__).parent
 load_dotenv(ROOT_DIR / '.env')
@@ -29,11 +31,42 @@ security = HTTPBearer()
 JWT_SECRET = os.environ.get('JWT_SECRET', 'electricalsystem2025securejwtsecret')
 EMERGENT_LLM_KEY = os.environ.get('EMERGENT_LLM_KEY', '')
 
+# PayPal Configuration
+PAYPAL_CLIENT_ID = os.environ.get('PAYPAL_CLIENT_ID', 'AW4860yNCSpE-0k4z_aIUW_E-RZFrQxM8aYRgjCfEUTOTuh16U07wgmW6jwpSo8AQ3FIU4x5CPhqVTjW')
+PAYPAL_SECRET = os.environ.get('PAYPAL_SECRET', 'EAttvam1khTZ62eINY-3K7W1aQXz7Xp0mwu3FDZZs9_URGqdMPVczCflYjepDKT_6NxXsqQ9MYhjv67X')
+PAYPAL_MODE = os.environ.get('PAYPAL_MODE', 'sandbox')  # sandbox or live
+
 class User(BaseModel):
     model_config = ConfigDict(extra="ignore")
     id: str = Field(default_factory=lambda: str(uuid.uuid4()))
     email: str
     name: str
+    role: str = "user"  # user, admin
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+
+class License(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    user_id: str
+    plan_type: str  # free, basic, enterprise
+    license_key: str
+    start_date: datetime
+    end_date: datetime
+    is_active: bool = True
+    payment_id: Optional[str] = None
+    amount_paid: float = 0.0
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+
+class PaymentConfig(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    payment_provider: str  # paypal, banco_pichincha
+    app_name: str
+    client_id: str
+    client_secret: str
+    access_token: Optional[str] = None
+    environment: str = "sandbox"  # sandbox, production
+    is_active: bool = True
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
 class UserCreate(BaseModel):
@@ -135,6 +168,24 @@ def create_token(user_id: str, email: str) -> str:
     }
     return jwt.encode(payload, JWT_SECRET, algorithm="HS256")
 
+def generate_license_key() -> str:
+    """Generate a unique license key"""
+    random_bytes = secrets.token_bytes(16)
+    hash_obj = hashlib.sha256(random_bytes)
+    license_key = hash_obj.hexdigest()[:32].upper()
+    # Format: XXXX-XXXX-XXXX-XXXX-XXXX-XXXX-XXXX-XXXX
+    formatted = '-'.join([license_key[i:i+4] for i in range(0, len(license_key), 4)])
+    return formatted
+
+async def check_license_validity(user_id: str) -> bool:
+    """Check if user has a valid active license"""
+    license_doc = await db.licenses.find_one({
+        "user_id": user_id,
+        "is_active": True,
+        "end_date": {"$gt": datetime.now(timezone.utc)}
+    })
+    return license_doc is not None
+
 async def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(security)):
     try:
         token = credentials.credentials
@@ -148,6 +199,11 @@ async def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(s
     except Exception as e:
         raise HTTPException(status_code=401, detail="Token inválido")
 
+async def get_current_admin(current_user: User = Depends(get_current_user)):
+    if current_user.role != "admin":
+        raise HTTPException(status_code=403, detail="Se requieren permisos de administrador")
+    return current_user
+
 @api_router.post("/auth/register")
 async def register(user_data: UserCreate):
     existing = await db.users.find_one({"email": user_data.email}, {"_id": 0})
@@ -155,15 +211,45 @@ async def register(user_data: UserCreate):
         raise HTTPException(status_code=400, detail="El email ya está registrado")
     
     hashed = bcrypt.hashpw(user_data.password.encode(), bcrypt.gensalt())
-    user = User(email=user_data.email, name=user_data.name)
+    
+    # Check if this is the first user - make them admin
+    user_count = await db.users.count_documents({})
+    role = "admin" if user_count == 0 else "user"
+    
+    user = User(email=user_data.email, name=user_data.name, role=role)
     doc = user.model_dump()
     doc["password"] = hashed.decode()
     doc["created_at"] = doc["created_at"].isoformat()
     
     await db.users.insert_one(doc)
+    
+    # Create free trial license for new users
+    if role == "user":
+        license = License(
+            user_id=user.id,
+            plan_type="free",
+            license_key=generate_license_key(),
+            start_date=datetime.now(timezone.utc),
+            end_date=datetime.now(timezone.utc) + timedelta(days=7),
+            is_active=True
+        )
+        license_doc = license.model_dump()
+        license_doc["start_date"] = license_doc["start_date"].isoformat()
+        license_doc["end_date"] = license_doc["end_date"].isoformat()
+        license_doc["created_at"] = license_doc["created_at"].isoformat()
+        await db.licenses.insert_one(license_doc)
+    
     token = create_token(user.id, user.email)
     
-    return {"token": token, "user": {"id": user.id, "email": user.email, "name": user.name}}
+    return {
+        "token": token,
+        "user": {
+            "id": user.id,
+            "email": user.email,
+            "name": user.name,
+            "role": user.role
+        }
+    }
 
 @api_router.post("/auth/login")
 async def login(login_data: UserLogin):
@@ -175,11 +261,41 @@ async def login(login_data: UserLogin):
         raise HTTPException(status_code=401, detail="Credenciales inválidas")
     
     token = create_token(user["id"], user["email"])
-    return {"token": token, "user": {"id": user["id"], "email": user["email"], "name": user["name"]}}
+    return {
+        "token": token,
+        "user": {
+            "id": user["id"],
+            "email": user["email"],
+            "name": user["name"],
+            "role": user.get("role", "user")
+        }
+    }
 
 @api_router.get("/auth/me")
 async def get_me(current_user: User = Depends(get_current_user)):
-    return {"id": current_user.id, "email": current_user.email, "name": current_user.name}
+    # Get license info if user is not admin
+    license_info = None
+    if current_user.role != "admin":
+        license_doc = await db.licenses.find_one(
+            {"user_id": current_user.id, "is_active": True},
+            {"_id": 0},
+            sort=[("end_date", -1)]
+        )
+        if license_doc:
+            license_info = {
+                "plan_type": license_doc.get("plan_type"),
+                "license_key": license_doc.get("license_key"),
+                "end_date": license_doc.get("end_date"),
+                "is_valid": datetime.fromisoformat(license_doc.get("end_date")) > datetime.now(timezone.utc) if isinstance(license_doc.get("end_date"), str) else license_doc.get("end_date") > datetime.now(timezone.utc)
+            }
+    
+    return {
+        "id": current_user.id,
+        "email": current_user.email,
+        "name": current_user.name,
+        "role": current_user.role,
+        "license": license_info
+    }
 
 @api_router.post("/projects")
 async def create_project(project_data: ProjectCreate, current_user: User = Depends(get_current_user)):
@@ -566,6 +682,264 @@ async def generate_budget(data: Dict[str, Any], current_user: User = Depends(get
     await db.budgets.insert_one(doc)
     
     return budget
+
+# ============ ADMIN ENDPOINTS ============
+
+@api_router.post("/admin/users")
+async def admin_create_user(user_data: UserCreate, admin: User = Depends(get_current_admin)):
+    """Admin creates a new user with credentials"""
+    existing = await db.users.find_one({"email": user_data.email}, {"_id": 0})
+    if existing:
+        raise HTTPException(status_code=400, detail="El email ya está registrado")
+    
+    hashed = bcrypt.hashpw(user_data.password.encode(), bcrypt.gensalt())
+    user = User(email=user_data.email, name=user_data.name, role="user")
+    doc = user.model_dump()
+    doc["password"] = hashed.decode()
+    doc["created_at"] = doc["created_at"].isoformat()
+    
+    await db.users.insert_one(doc)
+    
+    return {
+        "success": True,
+        "user": {"id": user.id, "email": user.email, "name": user.name},
+        "credentials": {"email": user_data.email, "password": user_data.password}
+    }
+
+@api_router.get("/admin/users")
+async def admin_list_users(admin: User = Depends(get_current_admin)):
+    """List all users with their license status"""
+    users = await db.users.find({}, {"_id": 0, "password": 0}).to_list(1000)
+    
+    for user in users:
+        if user.get("role") != "admin":
+            license_doc = await db.licenses.find_one(
+                {"user_id": user["id"], "is_active": True},
+                {"_id": 0},
+                sort=[("end_date", -1)]
+            )
+            user["license"] = license_doc if license_doc else None
+    
+    return users
+
+@api_router.post("/admin/licenses")
+async def admin_create_license(
+    user_id: str = Form(...),
+    plan_type: str = Form(...),
+    duration_days: int = Form(...),
+    admin: User = Depends(get_current_admin)
+):
+    """Admin generates a license for a user"""
+    user = await db.users.find_one({"id": user_id}, {"_id": 0})
+    if not user:
+        raise HTTPException(status_code=404, detail="Usuario no encontrado")
+    
+    license = License(
+        user_id=user_id,
+        plan_type=plan_type,
+        license_key=generate_license_key(),
+        start_date=datetime.now(timezone.utc),
+        end_date=datetime.now(timezone.utc) + timedelta(days=duration_days),
+        is_active=True
+    )
+    
+    doc = license.model_dump()
+    doc["start_date"] = doc["start_date"].isoformat()
+    doc["end_date"] = doc["end_date"].isoformat()
+    doc["created_at"] = doc["created_at"].isoformat()
+    
+    await db.licenses.insert_one(doc)
+    
+    return {
+        "success": True,
+        "license_key": license.license_key,
+        "plan_type": plan_type,
+        "valid_until": license.end_date
+    }
+
+@api_router.get("/admin/payment-configs")
+async def admin_get_payment_configs(admin: User = Depends(get_current_admin)):
+    """Get all payment configurations"""
+    configs = await db.payment_configs.find({}, {"_id": 0, "client_secret": 0}).to_list(100)
+    return configs
+
+@api_router.post("/admin/payment-configs")
+async def admin_save_payment_config(config_data: Dict[str, Any], admin: User = Depends(get_current_admin)):
+    """Save or update payment configuration"""
+    payment_config = PaymentConfig(**config_data)
+    doc = payment_config.model_dump()
+    doc["created_at"] = doc["created_at"].isoformat()
+    
+    # Update existing or create new
+    result = await db.payment_configs.update_one(
+        {"payment_provider": payment_config.payment_provider},
+        {"$set": doc},
+        upsert=True
+    )
+    
+    return {"success": True, "message": "Configuración guardada"}
+
+# ============ PAYMENT ENDPOINTS ============
+
+@api_router.get("/plans")
+async def get_plans():
+    """Get available subscription plans"""
+    return [
+        {
+            "id": "free",
+            "name": "Plan Free",
+            "price": 0,
+            "duration_days": 7,
+            "description": "1 semana de prueba gratuita"
+        },
+        {
+            "id": "basic",
+            "name": "Plan Básico",
+            "price": 100,
+            "duration_days": 365,
+            "description": "1 año de uso completo"
+        },
+        {
+            "id": "enterprise",
+            "name": "Plan Empresa",
+            "price": 200,
+            "duration_days": 1825,
+            "description": "5 años de uso total"
+        }
+    ]
+
+@api_router.post("/payment/create-order")
+async def create_payment_order(plan_id: str = Form(...), current_user: User = Depends(get_current_user)):
+    """Create a PayPal order for subscription"""
+    import requests
+    
+    plans = {
+        "basic": {"price": 100, "days": 365},
+        "enterprise": {"price": 200, "days": 1825}
+    }
+    
+    if plan_id not in plans:
+        raise HTTPException(status_code=400, detail="Plan inválido")
+    
+    plan = plans[plan_id]
+    
+    # Get PayPal access token
+    auth_response = requests.post(
+        f"https://api-m.{'sandbox.' if PAYPAL_MODE == 'sandbox' else ''}paypal.com/v1/oauth2/token",
+        headers={"Accept": "application/json"},
+        auth=(PAYPAL_CLIENT_ID, PAYPAL_SECRET),
+        data={"grant_type": "client_credentials"}
+    )
+    
+    if auth_response.status_code != 200:
+        raise HTTPException(status_code=500, detail="Error al conectar con PayPal")
+    
+    access_token = auth_response.json()["access_token"]
+    
+    # Create order
+    order_response = requests.post(
+        f"https://api-m.{'sandbox.' if PAYPAL_MODE == 'sandbox' else ''}paypal.com/v2/checkout/orders",
+        headers={
+            "Content-Type": "application/json",
+            "Authorization": f"Bearer {access_token}"
+        },
+        json={
+            "intent": "CAPTURE",
+            "purchase_units": [{
+                "amount": {
+                    "currency_code": "USD",
+                    "value": str(plan["price"])
+                },
+                "description": f"ElectroDesign Pro - {plan_id.title()}"
+            }],
+            "application_context": {
+                "return_url": f"{os.environ.get('FRONTEND_URL', 'http://localhost:3000')}/payment/success",
+                "cancel_url": f"{os.environ.get('FRONTEND_URL', 'http://localhost:3000')}/payment/cancel"
+            }
+        }
+    )
+    
+    if order_response.status_code != 201:
+        raise HTTPException(status_code=500, detail="Error al crear orden")
+    
+    order_data = order_response.json()
+    
+    return {
+        "order_id": order_data["id"],
+        "approval_url": next(link["href"] for link in order_data["links"] if link["rel"] == "approve")
+    }
+
+@api_router.post("/payment/capture-order")
+async def capture_payment_order(
+    order_id: str = Form(...),
+    plan_id: str = Form(...),
+    current_user: User = Depends(get_current_user)
+):
+    """Capture PayPal payment and activate license"""
+    import requests
+    
+    plans = {
+        "basic": {"price": 100, "days": 365, "name": "basic"},
+        "enterprise": {"price": 200, "days": 1825, "name": "enterprise"}
+    }
+    
+    if plan_id not in plans:
+        raise HTTPException(status_code=400, detail="Plan inválido")
+    
+    plan = plans[plan_id]
+    
+    # Get PayPal access token
+    auth_response = requests.post(
+        f"https://api-m.{'sandbox.' if PAYPAL_MODE == 'sandbox' else ''}paypal.com/v1/oauth2/token",
+        headers={"Accept": "application/json"},
+        auth=(PAYPAL_CLIENT_ID, PAYPAL_SECRET),
+        data={"grant_type": "client_credentials"}
+    )
+    
+    access_token = auth_response.json()["access_token"]
+    
+    # Capture order
+    capture_response = requests.post(
+        f"https://api-m.{'sandbox.' if PAYPAL_MODE == 'sandbox' else ''}paypal.com/v2/checkout/orders/{order_id}/capture",
+        headers={
+            "Content-Type": "application/json",
+            "Authorization": f"Bearer {access_token}"
+        }
+    )
+    
+    if capture_response.status_code != 201:
+        raise HTTPException(status_code=400, detail="Error al procesar el pago")
+    
+    capture_data = capture_response.json()
+    
+    if capture_data["status"] == "COMPLETED":
+        # Create license
+        license = License(
+            user_id=current_user.id,
+            plan_type=plan["name"],
+            license_key=generate_license_key(),
+            start_date=datetime.now(timezone.utc),
+            end_date=datetime.now(timezone.utc) + timedelta(days=plan["days"]),
+            is_active=True,
+            payment_id=order_id,
+            amount_paid=plan["price"]
+        )
+        
+        doc = license.model_dump()
+        doc["start_date"] = doc["start_date"].isoformat()
+        doc["end_date"] = doc["end_date"].isoformat()
+        doc["created_at"] = doc["created_at"].isoformat()
+        
+        await db.licenses.insert_one(doc)
+        
+        return {
+            "success": True,
+            "license_key": license.license_key,
+            "valid_until": license.end_date,
+            "message": "Pago procesado y licencia activada"
+        }
+    
+    raise HTTPException(status_code=400, detail="Pago no completado")
 
 app.include_router(api_router)
 
