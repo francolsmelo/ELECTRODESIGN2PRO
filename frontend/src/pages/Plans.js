@@ -36,15 +36,13 @@ const Plans = () => {
 
     try {
       const token = localStorage.getItem('token');
-      const formData = new FormData();
-      formData.append('plan_id', planId);
-
       const response = await fetch(`${API}/payment/create-order`, {
         method: 'POST',
         headers: {
-          'Authorization': `Bearer ${token}`
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
         },
-        body: formData
+        body: JSON.stringify({ plan_id: planId })
       });
 
       if (response.ok) {
@@ -52,9 +50,12 @@ const Plans = () => {
         // Redirect to PayPal
         window.location.href = data.approval_url;
       } else {
-        toast.error('Error al procesar el pago');
+        const errorData = await response.json();
+        toast.error(errorData.detail || 'Error al procesar el pago');
+        console.error('Payment error:', errorData);
       }
     } catch (error) {
+      console.error('Payment error:', error);
       toast.error('Error de conexión');
     }
     setProcessing(false);

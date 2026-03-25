@@ -809,9 +809,11 @@ async def get_plans():
     ]
 
 @api_router.post("/payment/create-order")
-async def create_payment_order(plan_id: str = Form(...), current_user: User = Depends(get_current_user)):
+async def create_payment_order(data: Dict[str, Any], current_user: User = Depends(get_current_user)):
     """Create a PayPal order for subscription"""
     import requests
+    
+    plan_id = data.get("plan_id")
     
     plans = {
         "basic": {"price": 100, "days": 365},
@@ -823,51 +825,57 @@ async def create_payment_order(plan_id: str = Form(...), current_user: User = De
     
     plan = plans[plan_id]
     
-    # Get PayPal access token
-    auth_response = requests.post(
-        f"https://api-m.{'sandbox.' if PAYPAL_MODE == 'sandbox' else ''}paypal.com/v1/oauth2/token",
-        headers={"Accept": "application/json"},
-        auth=(PAYPAL_CLIENT_ID, PAYPAL_SECRET),
-        data={"grant_type": "client_credentials"}
-    )
-    
-    if auth_response.status_code != 200:
-        raise HTTPException(status_code=500, detail="Error al conectar con PayPal")
-    
-    access_token = auth_response.json()["access_token"]
-    
-    # Create order
-    order_response = requests.post(
-        f"https://api-m.{'sandbox.' if PAYPAL_MODE == 'sandbox' else ''}paypal.com/v2/checkout/orders",
-        headers={
-            "Content-Type": "application/json",
-            "Authorization": f"Bearer {access_token}"
-        },
-        json={
-            "intent": "CAPTURE",
-            "purchase_units": [{
-                "amount": {
-                    "currency_code": "USD",
-                    "value": str(plan["price"])
-                },
-                "description": f"ElectroDesign Pro - {plan_id.title()}"
-            }],
-            "application_context": {
-                "return_url": f"{os.environ.get('FRONTEND_URL', 'http://localhost:3000')}/payment/success",
-                "cancel_url": f"{os.environ.get('FRONTEND_URL', 'http://localhost:3000')}/payment/cancel"
+    try:
+        # Get PayPal access token
+        auth_response = requests.post(
+            f"https://api-m.{'sandbox.' if PAYPAL_MODE == 'sandbox' else ''}paypal.com/v1/oauth2/token",
+            headers={"Accept": "application/json", "Accept-Language": "en_US"},
+            auth=(PAYPAL_CLIENT_ID, PAYPAL_SECRET),
+            data={"grant_type": "client_credentials"}
+        )
+        
+        if auth_response.status_code != 200:
+            raise HTTPException(status_code=500, detail=f"Error al conectar con PayPal: {auth_response.text}")
+        
+        access_token = auth_response.json()["access_token"]
+        
+        # Create order
+        order_response = requests.post(
+            f"https://api-m.{'sandbox.' if PAYPAL_MODE == 'sandbox' else ''}paypal.com/v2/checkout/orders",
+            headers={
+                "Content-Type": "application/json",
+                "Authorization": f"Bearer {access_token}"
+            },
+            json={
+                "intent": "CAPTURE",
+                "purchase_units": [{
+                    "amount": {
+                        "currency_code": "USD",
+                        "value": str(plan["price"])
+                    },
+                    "description": f"ElectroDesign Pro - Plan {plan_id.title()}"
+                }],
+                "application_context": {
+                    "brand_name": "ElectroDesign Pro",
+                    "return_url": f"{os.environ.get('FRONTEND_URL', 'http://localhost:3000')}/payment/success?plan_id={plan_id}",
+                    "cancel_url": f"{os.environ.get('FRONTEND_URL', 'http://localhost:3000')}/plans"
+                }
             }
+        )
+        
+        if order_response.status_code != 201:
+            raise HTTPException(status_code=500, detail=f"Error al crear orden: {order_response.text}")
+        
+        order_data = order_response.json()
+        
+        return {
+            "order_id": order_data["id"],
+            "approval_url": next(link["href"] for link in order_data["links"] if link["rel"] == "approve")
         }
-    )
-    
-    if order_response.status_code != 201:
-        raise HTTPException(status_code=500, detail="Error al crear orden")
-    
-    order_data = order_response.json()
-    
-    return {
-        "order_id": order_data["id"],
-        "approval_url": next(link["href"] for link in order_data["links"] if link["rel"] == "approve")
-    }
+    except requests.exceptions.RequestException as e:
+        raise HTTPException(status_code=500, detail=f"Error de conexión con PayPal: {str(e)}")
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error al procesar: {str(e)}")
 
 @api_router.post("/payment/capture-order")
 async def capture_payment_order(
