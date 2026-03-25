@@ -2,7 +2,7 @@ import React, { useState, useRef, useEffect } from 'react';
 import { Stage, Layer, Line, Circle, Text, Image as KonvaImage } from 'react-konva';
 import { API } from '../App';
 import { toast } from 'sonner';
-import { Upload, Pencil, MapPin, Save, Trash2, Eye, Plus } from 'lucide-react';
+import { Upload, Pencil, MapPin, Save, Trash2, Eye, Plus, Undo2 } from 'lucide-react';
 import useImage from 'use-image';
 
 const DrawingTools = {
@@ -22,7 +22,8 @@ const MarkerTypes = {
   PANEL: 'Tablero',
   POLE: 'Poste',
   GROUNDING: 'Puesta a Tierra',
-  MANHOLE: 'Pozo de Revisión'
+  MANHOLE: 'Pozo de Revisión',
+  ELECTRICAL_LOAD: 'Carga Eléctrica'
 };
 
 const InspectionModule = ({ projectId }) => {
@@ -157,6 +158,12 @@ const InspectionModule = ({ projectId }) => {
     
     const stage = e.target.getStage();
     const point = stage.getPointerPosition();
+    
+    if (!point) {
+      setIsDrawing(false);
+      return;
+    }
+    
     const adjustedX = point.x / scale;
     const adjustedY = point.y / scale;
     let lastLine = drawings[drawings.length - 1];
@@ -169,6 +176,17 @@ const InspectionModule = ({ projectId }) => {
 
   const handleMouseUp = () => {
     setIsDrawing(false);
+  };
+
+  const handleMouseLeave = () => {
+    setIsDrawing(false);
+  };
+
+  const handleUndo = () => {
+    if (drawings.length > 0) {
+      setDrawings(drawings.slice(0, -1));
+      toast.success('Último elemento eliminado');
+    }
   };
 
   const handleAnalyzeImage = async () => {
@@ -514,12 +532,21 @@ const InspectionModule = ({ projectId }) => {
                 Marcador (Equipos)
               </button>
               <button
+                onClick={handleUndo}
+                className="btn btn-outline"
+                disabled={drawings.length === 0}
+                data-testid="undo-button"
+              >
+                <Undo2 className="w-4 h-4 mr-2 inline" />
+                Deshacer
+              </button>
+              <button
                 onClick={handleClearDrawings}
                 className="btn btn-outline"
                 data-testid="clear-drawings-button"
               >
                 <Trash2 className="w-4 h-4 mr-2 inline" />
-                Limpiar
+                Limpiar Todo
               </button>
             </div>
 
@@ -600,6 +627,7 @@ const InspectionModule = ({ projectId }) => {
                 onMouseDown={handleMouseDown}
                 onMouseMove={handleMouseMove}
                 onMouseUp={handleMouseUp}
+                onMouseLeave={handleMouseLeave}
                 scaleX={scale}
                 scaleY={scale}
               >

@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { API } from '../App';
 import { toast } from 'sonner';
-import { Plus, Trash2, DollarSign, FileText } from 'lucide-react';
+import { Plus, Trash2, DollarSign, FileText, Upload } from 'lucide-react';
 
 const BudgetModule = ({ projectId }) => {
   const [materials, setMaterials] = useState([
@@ -16,6 +16,7 @@ const BudgetModule = ({ projectId }) => {
   const [ivaPercent, setIvaPercent] = useState(15);
   const [result, setResult] = useState(null);
   const [generating, setGenerating] = useState(false);
+  const [uploadingExcel, setUploadingExcel] = useState(false);
 
   const addItem = (setter, items) => {
     setter([...items, {
@@ -77,11 +78,80 @@ const BudgetModule = ({ projectId }) => {
     setGenerating(false);
   };
 
+  const handleUploadExcel = async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+
+    setUploadingExcel(true);
+    try {
+      const formData = new FormData();
+      formData.append('file', file);
+
+      const token = localStorage.getItem('token');
+      const response = await fetch(`${API}/budget/upload-excel`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`
+        },
+        body: formData
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        
+        // Convertir arrays importados a formato con IDs
+        const materialsWithIds = data.materials.map((item, index) => ({
+          id: Date.now() + index,
+          ...item
+        }));
+        
+        const laborWithIds = data.labor.map((item, index) => ({
+          id: Date.now() + index + 1000,
+          ...item
+        }));
+        
+        setMaterials(materialsWithIds.length > 0 ? materialsWithIds : materials);
+        setLabor(laborWithIds.length > 0 ? laborWithIds : labor);
+        
+        toast.success(data.message || 'Archivo Excel importado correctamente');
+      } else {
+        const errorData = await response.json();
+        toast.error(errorData.detail || 'Error al importar Excel');
+      }
+    } catch (error) {
+      toast.error('Error al procesar el archivo');
+    }
+    setUploadingExcel(false);
+    e.target.value = ''; // Reset file input
+  };
+
   return (
     <div>
       <div className="card mb-6">
         <h2 className="text-lg font-bold mb-4" style={{color: 'var(--color-primary)'}}>Generación de Presupuesto (APU)</h2>
-        <p className="text-sm mb-4" style={{color: 'var(--color-text-secondary)'}}>Ingrese materiales, mano de obra y costos de desmantelamiento</p>
+        <p className="text-sm mb-4" style={{color: 'var(--color-text-secondary)'}}>
+          Opción 1: Ingresa materiales y mano de obra manualmente | Opción 2: Sube archivo Excel con la cotización
+        </p>
+
+        <div className="mb-6 p-4 rounded border" style={{backgroundColor: '#F0F9FF', borderColor: 'var(--color-border)'}}>
+          <h3 className="font-semibold mb-3" style={{color: 'var(--color-primary)'}}>
+            Importar desde Excel
+          </h3>
+          <p className="text-sm mb-3" style={{color: 'var(--color-text-secondary)'}}>
+            Sube el archivo "Archivo base para subir cotización.xls" y el sistema importará automáticamente materiales y mano de obra
+          </p>
+          <label className="btn btn-primary cursor-pointer" data-testid="upload-excel-button">
+            <Upload className="w-4 h-4 inline mr-2" />
+            {uploadingExcel ? 'Importando...' : 'Subir Archivo Excel'}
+            <input
+              type="file"
+              accept=".xls,.xlsx"
+              onChange={handleUploadExcel}
+              className="hidden"
+              disabled={uploadingExcel}
+            />
+          </label>
+        </div>
 
         <div className="mb-6">
           <div className="flex items-center justify-between mb-3">

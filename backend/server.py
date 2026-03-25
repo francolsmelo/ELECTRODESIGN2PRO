@@ -401,6 +401,70 @@ async def get_conductors(current_user: User = Depends(get_current_user)):
     conductors = await db.conductors.find({}, {"_id": 0}).to_list(1000)
     return conductors
 
+@api_router.post("/budget/upload-excel")
+async def upload_budget_excel(file: UploadFile = File(...), current_user: User = Depends(get_current_user)):
+    try:
+        import openpyxl
+        from io import BytesIO
+        
+        contents = await file.read()
+        wb = openpyxl.load_workbook(BytesIO(contents))
+        ws = wb.active
+        
+        materials = []
+        labor = []
+        current_section = None
+        
+        for row in ws.iter_rows(min_row=2, values_only=True):
+            if not row[0]:
+                continue
+                
+            # Detectar secciones
+            row_text = str(row[0]).strip().upper() if row[0] else ""
+            
+            if "SUBTOTAL MANO DE OBRA" in row_text:
+                current_section = "labor"
+                continue
+            elif "SUBTOTAL" in row_text or "TOTAL" in row_text:
+                continue
+                
+            # Procesar filas de datos
+            if len(row) >= 5:
+                item_num = row[0]
+                description = row[1]
+                unit = row[2]
+                quantity = row[3]
+                unit_price = row[4]
+                
+                if description and quantity and unit_price:
+                    try:
+                        qty = float(quantity) if quantity else 0
+                        price = float(unit_price) if unit_price else 0
+                        
+                        item_data = {
+                            "description": str(description),
+                            "unit": str(unit) if unit else "U",
+                            "quantity": qty,
+                            "unit_price": price
+                        }
+                        
+                        if current_section == "labor":
+                            labor.append(item_data)
+                        else:
+                            materials.append(item_data)
+                    except (ValueError, TypeError):
+                        continue
+        
+        return {
+            "success": True,
+            "materials": materials,
+            "labor": labor,
+            "message": f"Importados {len(materials)} materiales y {len(labor)} mano de obra"
+        }
+        
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=f"Error procesando Excel: {str(e)}")
+
 @api_router.post("/budget/generate")
 async def generate_budget(data: Dict[str, Any], current_user: User = Depends(get_current_user)):
     materials = data.get("materials", [])
