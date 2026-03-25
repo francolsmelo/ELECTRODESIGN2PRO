@@ -19,7 +19,8 @@ const Login = () => {
       const response = await fetch(`${API}/auth/login`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email, password })
+        body: JSON.stringify({ email, password }),
+        cache: 'no-cache'
       });
 
       const data = await response.json();
@@ -30,11 +31,22 @@ const Login = () => {
         return;
       }
 
+      // Guardar token y datos del usuario
       localStorage.setItem('token', data.token);
+      localStorage.setItem('user', JSON.stringify(data.user));
+      
+      // Actualizar contexto
       setUser(data.user);
+      
       toast.success('Sesión iniciada correctamente');
-      navigate('/dashboard');
+      
+      // Forzar navegación
+      setTimeout(() => {
+        navigate('/dashboard', { replace: true });
+        window.location.reload();
+      }, 100);
     } catch (error) {
+      console.error('Login error:', error);
       toast.error('Error de conexión');
       setLoading(false);
     }

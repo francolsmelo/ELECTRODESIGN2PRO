@@ -20,7 +20,8 @@ const Register = () => {
       const response = await fetch(`${API}/auth/register`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name, email, password })
+        body: JSON.stringify({ name, email, password }),
+        cache: 'no-cache'
       });
 
       const data = await response.json();
@@ -32,10 +33,16 @@ const Register = () => {
       }
 
       localStorage.setItem('token', data.token);
+      localStorage.setItem('user', JSON.stringify(data.user));
       setUser(data.user);
       toast.success('Cuenta creada correctamente');
-      navigate('/dashboard');
+      
+      setTimeout(() => {
+        navigate('/dashboard', { replace: true });
+        window.location.reload();
+      }, 100);
     } catch (error) {
+      console.error('Register error:', error);
       toast.error('Error de conexión');
       setLoading(false);
     }

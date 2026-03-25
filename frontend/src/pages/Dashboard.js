@@ -2,11 +2,15 @@ import React, { useState, useEffect, useContext } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { AuthContext, API } from '../App';
 import { toast } from 'sonner';
-import { Plus, FolderOpen, LogOut, Zap, MapPin, Cpu } from 'lucide-react';
+import { Plus, FolderOpen, LogOut, Zap, MapPin, Cpu, Trash2 } from 'lucide-react';
 
 const Dashboard = () => {
   const [projects, setProjects] = useState([]);
   const [showModal, setShowModal] = useState(false);
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [projectToDelete, setProjectToDelete] = useState(null);
+  const [deletePassword, setDeletePassword] = useState('');
+  const [deletingProject, setDeletingProject] = useState(false);
   const [newProject, setNewProject] = useState({ name: '', location: '', voltage_system: '220/127V' });
   const [loading, setLoading] = useState(true);
   const { user, setUser } = useContext(AuthContext);
@@ -59,6 +63,50 @@ const Dashboard = () => {
     localStorage.removeItem('token');
     setUser(null);
     navigate('/login');
+  };
+
+  const handleDeleteClick = (e, project) => {
+    e.stopPropagation();
+    setProjectToDelete(project);
+    setShowDeleteModal(true);
+    setDeletePassword('');
+  };
+
+  const handleDeleteProject = async (e) => {
+    e.preventDefault();
+    if (!deletePassword) {
+      toast.error('Por favor ingresa tu contraseña');
+      return;
+    }
+
+    setDeletingProject(true);
+    try {
+      const token = localStorage.getItem('token');
+      const formData = new FormData();
+      formData.append('password', deletePassword);
+
+      const response = await fetch(`${API}/projects/${projectToDelete.id}`, {
+        method: 'DELETE',
+        headers: {
+          'Authorization': `Bearer ${token}`
+        },
+        body: formData
+      });
+
+      if (response.ok) {
+        toast.success('Proyecto eliminado correctamente');
+        setShowDeleteModal(false);
+        setProjectToDelete(null);
+        setDeletePassword('');
+        fetchProjects();
+      } else {
+        const data = await response.json();
+        toast.error(data.detail || 'Error al eliminar proyecto');
+      }
+    } catch (error) {
+      toast.error('Error de conexión');
+    }
+    setDeletingProject(false);
   };
 
   return (
@@ -129,11 +177,19 @@ const Dashboard = () => {
               {projects.map(project => (
                 <div
                   key={project.id}
-                  className="card cursor-pointer"
+                  className="card cursor-pointer relative"
                   onClick={() => navigate(`/project/${project.id}`)}
                   data-testid={`project-card-${project.id}`}
                   style={{transition: 'all 0.2s'}}
                 >
+                  <button
+                    onClick={(e) => handleDeleteClick(e, project)}
+                    className="absolute top-2 right-2 p-2 rounded hover:bg-red-50 text-red-500 hover:text-red-700"
+                    title="Eliminar proyecto"
+                    data-testid={`delete-project-${project.id}`}
+                  >
+                    <Trash2 className="w-4 h-4" />
+                  </button>
                   <div className="flex items-start justify-between mb-3">
                     <div className="p-2 rounded" style={{backgroundColor: '#E0F2FE'}}>
                       <Cpu className="w-6 h-6" style={{color: 'var(--color-secondary)'}} />
@@ -211,6 +267,63 @@ const Dashboard = () => {
                 </button>
                 <button type="submit" className="btn btn-primary flex-1" data-testid="project-submit-button">
                   Crear Proyecto
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {showDeleteModal && projectToDelete && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50" data-testid="delete-project-modal">
+          <div className="card w-full max-w-md" style={{margin: '1rem'}}>
+            <h2 className="text-xl font-bold mb-4" style={{color: 'var(--color-danger)'}}>
+              Eliminar Proyecto
+            </h2>
+            <div className="mb-4 p-3 rounded" style={{backgroundColor: '#FEE2E2', borderLeft: '4px solid var(--color-danger)'}}>
+              <p className="font-semibold mb-1" style={{color: 'var(--color-danger)'}}>⚠️ Acción Irreversible</p>
+              <p className="text-sm" style={{color: '#991b1b'}}>
+                Estás a punto de eliminar el proyecto "<strong>{projectToDelete.name}</strong>". 
+                Esto eliminará todas las inspecciones, cálculos y presupuestos asociados.
+              </p>
+            </div>
+            <form onSubmit={handleDeleteProject}>
+              <div className="mb-6">
+                <label className="block text-sm font-medium mb-2" style={{color: 'var(--color-text-secondary)'}}>
+                  Confirma con tu contraseña:
+                </label>
+                <input
+                  type="password"
+                  className="input"
+                  value={deletePassword}
+                  onChange={(e) => setDeletePassword(e.target.value)}
+                  required
+                  data-testid="delete-password-input"
+                  placeholder="Ingresa tu contraseña"
+                  autoFocus
+                />
+              </div>
+              
+              <div className="flex gap-2">
+                <button 
+                  type="button" 
+                  onClick={() => {
+                    setShowDeleteModal(false);
+                    setProjectToDelete(null);
+                    setDeletePassword('');
+                  }} 
+                  className="btn btn-outline flex-1"
+                >
+                  Cancelar
+                </button>
+                <button 
+                  type="submit" 
+                  className="btn flex-1" 
+                  style={{backgroundColor: 'var(--color-danger)', color: 'white'}}
+                  disabled={deletingProject}
+                  data-testid="confirm-delete-button"
+                >
+                  {deletingProject ? 'Eliminando...' : 'Eliminar Proyecto'}
                 </button>
               </div>
             </form>

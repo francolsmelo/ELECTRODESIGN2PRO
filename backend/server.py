@@ -200,6 +200,27 @@ async def get_projects(current_user: User = Depends(get_current_user)):
             p["updated_at"] = datetime.fromisoformat(p["updated_at"])
     return projects
 
+@api_router.delete("/projects/{project_id}")
+async def delete_project(project_id: str, password: str = Form(...), current_user: User = Depends(get_current_user)):
+    # Verificar contraseña
+    user_doc = await db.users.find_one({"id": current_user.id}, {"_id": 0})
+    if not user_doc or not bcrypt.checkpw(password.encode(), user_doc["password"].encode()):
+        raise HTTPException(status_code=401, detail="Contraseña incorrecta")
+    
+    # Verificar que el proyecto pertenezca al usuario
+    project = await db.projects.find_one({"id": project_id, "user_id": current_user.id}, {"_id": 0})
+    if not project:
+        raise HTTPException(status_code=404, detail="Proyecto no encontrado")
+    
+    # Eliminar proyecto y todos sus datos relacionados
+    await db.projects.delete_one({"id": project_id})
+    await db.inspections.delete_many({"project_id": project_id})
+    await db.demand_calculations.delete_many({"project_id": project_id})
+    await db.voltage_drops.delete_many({"project_id": project_id})
+    await db.budgets.delete_many({"project_id": project_id})
+    
+    return {"success": True, "message": "Proyecto eliminado correctamente"}
+
 @api_router.get("/projects/{project_id}")
 async def get_project(project_id: str, current_user: User = Depends(get_current_user)):
     project = await db.projects.find_one({"id": project_id, "user_id": current_user.id}, {"_id": 0})
@@ -405,65 +426,112 @@ async def get_conductors(current_user: User = Depends(get_current_user)):
 async def upload_budget_excel(file: UploadFile = File(...), current_user: User = Depends(get_current_user)):
     try:
         import openpyxl
+        import xlrd
         from io import BytesIO
         
         contents = await file.read()
-        wb = openpyxl.load_workbook(BytesIO(contents))
-        ws = wb.active
+        filename = file.filename.lower()
         
         materials = []
         labor = []
         current_section = None
         
-        for row in ws.iter_rows(min_row=2, values_only=True):
-            if not row[0]:
-                continue
-                
-            # Detectar secciones
-            row_text = str(row[0]).strip().upper() if row[0] else ""
+        # Detectar formato del archivo
+        if filename.endswith('.xlsx'):
+            # Formato nuevo - usar openpyxl
+            wb = openpyxl.load_workbook(BytesIO(contents))
+            ws = wb.active
             
-            if "SUBTOTAL MANO DE OBRA" in row_text:
-                current_section = "labor"
-                continue
-            elif "SUBTOTAL" in row_text or "TOTAL" in row_text:
-                continue
+            for row in ws.iter_rows(min_row=2, values_only=True):
+                if not row or not row[0]:
+                    continue
+                    
+                row_text = str(row[0]).strip().upper() if row[0] else ""
                 
-            # Procesar filas de datos
-            if len(row) >= 5:
-                item_num = row[0]
-                description = row[1]
-                unit = row[2]
-                quantity = row[3]
-                unit_price = row[4]
-                
-                if description and quantity and unit_price:
+                if "SUBTOTAL MANO DE OBRA" in row_text or "MANO DE OBRA" in row_text:
+                    current_section = "labor"
+                    continue
+                elif "SUBTOTAL" in row_text or "TOTAL DIRECTO" in row_text:
+                    if current_section == "labor":
+                        break
+                    continue
+                    
+                if len(row) >= 5 and row[1]:
                     try:
-                        qty = float(quantity) if quantity else 0
-                        price = float(unit_price) if unit_price else 0
+                        description = str(row[1]).strip()
+                        unit = str(row[2]).strip() if row[2] else "U"
+                        quantity = float(row[3]) if row[3] else 0
+                        unit_price = float(row[4]) if row[4] else 0
                         
-                        item_data = {
-                            "description": str(description),
-                            "unit": str(unit) if unit else "U",
-                            "quantity": qty,
-                            "unit_price": price
-                        }
+                        if description and quantity >= 0 and unit_price >= 0:
+                            item_data = {
+                                "description": description,
+                                "unit": unit,
+                                "quantity": quantity,
+                                "unit_price": unit_price
+                            }
+                            
+                            if current_section == "labor":
+                                labor.append(item_data)
+                            else:
+                                materials.append(item_data)
+                    except (ValueError, TypeError) as e:
+                        continue
+        else:
+            # Formato antiguo .xls - usar xlrd
+            wb = xlrd.open_workbook(file_contents=contents)
+            ws = wb.sheet_by_index(0)
+            
+            for row_idx in range(1, ws.nrows):
+                row = ws.row_values(row_idx)
+                
+                if not row or not row[0]:
+                    continue
+                    
+                row_text = str(row[0]).strip().upper() if row[0] else ""
+                
+                if "SUBTOTAL MANO DE OBRA" in row_text or "MANO DE OBRA" in row_text:
+                    current_section = "labor"
+                    continue
+                elif "SUBTOTAL" in row_text or "TOTAL DIRECTO" in row_text:
+                    if current_section == "labor":
+                        break
+                    continue
+                    
+                if len(row) >= 5 and row[1]:
+                    try:
+                        description = str(row[1]).strip()
+                        unit = str(row[2]).strip() if row[2] else "U"
+                        quantity = float(row[3]) if row[3] else 0
+                        unit_price = float(row[4]) if row[4] else 0
                         
-                        if current_section == "labor":
-                            labor.append(item_data)
-                        else:
-                            materials.append(item_data)
-                    except (ValueError, TypeError):
+                        if description and quantity >= 0 and unit_price >= 0:
+                            item_data = {
+                                "description": description,
+                                "unit": unit,
+                                "quantity": quantity,
+                                "unit_price": unit_price
+                            }
+                            
+                            if current_section == "labor":
+                                labor.append(item_data)
+                            else:
+                                materials.append(item_data)
+                    except (ValueError, TypeError) as e:
                         continue
         
         return {
             "success": True,
             "materials": materials,
             "labor": labor,
-            "message": f"Importados {len(materials)} materiales y {len(labor)} mano de obra"
+            "message": f"✓ Importados {len(materials)} materiales y {len(labor)} mano de obra"
         }
         
     except Exception as e:
-        raise HTTPException(status_code=400, detail=f"Error procesando Excel: {str(e)}")
+        import traceback
+        error_detail = f"Error procesando Excel: {str(e)}\n{traceback.format_exc()}"
+        print(error_detail)
+        raise HTTPException(status_code=400, detail=f"Error procesando archivo: {str(e)}")
 
 @api_router.post("/budget/generate")
 async def generate_budget(data: Dict[str, Any], current_user: User = Depends(get_current_user)):
