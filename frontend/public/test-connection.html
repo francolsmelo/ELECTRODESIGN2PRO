@@ -1,0 +1,93 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Test Conexión ElectroDesign</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 50px auto;
+            padding: 20px;
+        }
+        .result { 
+            margin: 10px 0; 
+            padding: 10px; 
+            border-radius: 4px;
+        }
+        .success { background: #d4edda; color: #155724; }
+        .error { background: #f8d7da; color: #721c24; }
+        button {
+            padding: 10px 20px;
+            margin: 5px;
+            cursor: pointer;
+        }
+    </style>
+</head>
+<body>
+    <h1>Test de Conexión - ElectroDesign Pro</h1>
+    <div id="results"></div>
+    
+    <h3>Probar Login:</h3>
+    <input type="email" id="email" placeholder="Email" value="test@electrodesign.com" style="padding: 8px; width: 300px;">
+    <input type="password" id="password" placeholder="Password" value="test123" style="padding: 8px; width: 200px;">
+    <button onclick="testLogin()">Probar Login</button>
+    
+    <script>
+        const BACKEND_URL = window.location.origin;
+        const API_URL = BACKEND_URL + '/api';
+        
+        function addResult(message, isSuccess) {
+            const div = document.createElement('div');
+            div.className = 'result ' + (isSuccess ? 'success' : 'error');
+            div.textContent = message;
+            document.getElementById('results').appendChild(div);
+        }
+        
+        async function testConnection() {
+            addResult('🔍 Testing connection to: ' + API_URL, true);
+            
+            try {
+                const response = await fetch(API_URL + '/plans');
+                const data = await response.json();
+                addResult('✅ Backend conectado correctamente!', true);
+                addResult('Planes disponibles: ' + data.length, true);
+            } catch (error) {
+                addResult('❌ Error conectando al backend: ' + error.message, false);
+            }
+        }
+        
+        async function testLogin() {
+            const email = document.getElementById('email').value;
+            const password = document.getElementById('password').value;
+            
+            addResult('🔑 Intentando login con: ' + email, true);
+            
+            try {
+                const response = await fetch(API_URL + '/auth/login', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ email, password })
+                });
+                
+                const data = await response.json();
+                
+                if (response.ok) {
+                    addResult('✅ Login exitoso! Usuario: ' + data.user.name, true);
+                    addResult('Token: ' + data.token.substring(0, 50) + '...', true);
+                } else {
+                    addResult('❌ Login fallido: ' + data.detail, false);
+                }
+            } catch (error) {
+                addResult('❌ Error en login: ' + error.message, false);
+            }
+        }
+        
+        // Auto test on load
+        window.onload = () => {
+            testConnection();
+        };
+    </script>
+</body>
+</html>
