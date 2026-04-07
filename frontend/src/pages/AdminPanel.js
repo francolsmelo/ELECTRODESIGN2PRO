@@ -2,7 +2,7 @@ import React, { useState, useEffect, useContext } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { AuthContext, API } from '../App';
 import { toast } from 'sonner';
-import { Users, Key, Settings, ArrowLeft, Plus, Shield } from 'lucide-react';
+import { Users, Key, Settings, ArrowLeft, Plus, Shield, Edit, Trash2, X } from 'lucide-react';
 
 const AdminPanel = () => {
   const [activeTab, setActiveTab] = useState('users');
@@ -11,8 +11,11 @@ const AdminPanel = () => {
   const [loading, setLoading] = useState(true);
   const [showCreateUser, setShowCreateUser] = useState(false);
   const [showCreateLicense, setShowCreateLicense] = useState(false);
+  const [showEditLicense, setShowEditLicense] = useState(false);
+  const [selectedUser, setSelectedUser] = useState(null);
   const [newUser, setNewUser] = useState({ name: '', email: '', password: '' });
   const [newLicense, setNewLicense] = useState({ user_id: '', plan_type: 'basic', duration_days: 365 });
+  const [editLicense, setEditLicense] = useState({ plan_type: 'basic', duration_days: 365 });
   const { user } = useContext(AuthContext);
   const navigate = useNavigate();
 
@@ -75,7 +78,8 @@ const AdminPanel = () => {
         setNewUser({ name: '', email: '', password: '' });
         fetchData();
       } else {
-        toast.error('Error al crear usuario');
+        const errorData = await response.json();
+        toast.error(errorData.detail || 'Error al crear usuario');
       }
     } catch (error) {
       toast.error('Error de conexión');
@@ -110,6 +114,79 @@ const AdminPanel = () => {
     } catch (error) {
       toast.error('Error de conexión');
     }
+  };
+
+  const handleEditLicense = async (e) => {
+    e.preventDefault();
+    if (!selectedUser) return;
+
+    try {
+      const token = localStorage.getItem('token');
+      const formData = new FormData();
+      formData.append('plan_type', editLicense.plan_type);
+      formData.append('duration_days', editLicense.duration_days);
+
+      const response = await fetch(`${API}/admin/users/${selectedUser.id}/license`, {
+        method: 'PUT',
+        headers: {
+          'Authorization': `Bearer ${token}`
+        },
+        body: formData
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        toast.success(`Licencia actualizada para ${selectedUser.name}`);
+        setShowEditLicense(false);
+        setSelectedUser(null);
+        fetchData();
+      } else {
+        const errorData = await response.json();
+        toast.error(errorData.detail || 'Error al actualizar licencia');
+      }
+    } catch (error) {
+      toast.error('Error de conexión');
+    }
+  };
+
+  const handleDeleteUser = async (userId, userName) => {
+    if (userId === user.id) {
+      toast.error('No puedes eliminarte a ti mismo');
+      return;
+    }
+
+    if (!window.confirm(`¿Estás seguro de eliminar al usuario ${userName}? Esta acción eliminará todos sus proyectos y datos.`)) {
+      return;
+    }
+
+    try {
+      const token = localStorage.getItem('token');
+      const response = await fetch(`${API}/admin/users/${userId}`, {
+        method: 'DELETE',
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
+
+      if (response.ok) {
+        toast.success(`Usuario ${userName} eliminado correctamente`);
+        fetchData();
+      } else {
+        const errorData = await response.json();
+        toast.error(errorData.detail || 'Error al eliminar usuario');
+      }
+    } catch (error) {
+      toast.error('Error de conexión');
+    }
+  };
+
+  const openEditLicense = (userItem) => {
+    setSelectedUser(userItem);
+    setEditLicense({
+      plan_type: userItem.license?.plan_type || 'basic',
+      duration_days: 365
+    });
+    setShowEditLicense(true);
   };
 
   return (
@@ -183,24 +260,47 @@ const AdminPanel = () => {
                           <th>Rol</th>
                           <th>Licencia</th>
                           <th>Estado</th>
+                          <th>Acciones</th>
                         </tr>
                       </thead>
                       <tbody>
-                        {users.map(user => (
-                          <tr key={user.id}>
-                            <td>{user.name}</td>
-                            <td>{user.email}</td>
+                        {users.map(userItem => (
+                          <tr key={userItem.id}>
+                            <td>{userItem.name}</td>
+                            <td>{userItem.email}</td>
                             <td>
-                              <span className={`status-badge ${user.role === 'admin' ? 'success' : ''}`}>
-                                {user.role}
+                              <span className={`status-badge ${userItem.role === 'admin' ? 'success' : ''}`}>
+                                {userItem.role}
                               </span>
                             </td>
-                            <td>{user.license?.plan_type || 'Sin licencia'}</td>
+                            <td>{userItem.license?.plan_type || 'Sin licencia'}</td>
                             <td>
-                              {user.license && new Date(user.license.end_date) > new Date() ? (
+                              {userItem.role === 'admin' ? (
+                                <span className="status-badge success">Admin</span>
+                              ) : userItem.license && new Date(userItem.license.end_date) > new Date() ? (
                                 <span className="status-badge success">Activa</span>
                               ) : (
                                 <span className="status-badge danger">Expirada</span>
+                              )}
+                            </td>
+                            <td>
+                              {userItem.role !== 'admin' && (
+                                <div className="flex gap-2">
+                                  <button
+                                    onClick={() => openEditLicense(userItem)}
+                                    className="btn btn-secondary btn-sm"
+                                    title="Editar licencia"
+                                  >
+                                    <Edit className="w-4 h-4" />
+                                  </button>
+                                  <button
+                                    onClick={() => handleDeleteUser(userItem.id, userItem.name)}
+                                    className="btn btn-danger btn-sm"
+                                    title="Eliminar usuario"
+                                  >
+                                    <Trash2 className="w-4 h-4" />
+                                  </button>
+                                </div>
                               )}
                             </td>
                           </tr>
@@ -248,10 +348,7 @@ const AdminPanel = () => {
                         <input type="text" className="input" placeholder="Client ID" disabled />
                         <input type="text" className="input" placeholder="Client Secret" disabled />
                         <input type="text" className="input" placeholder="Access Token" disabled />
-                        <select className="input" disabled>
-                          <option>Sandbox</option>
-                          <option>Producción</option>
-                        </select>
+                        <button className="btn btn-secondary" disabled>Guardar Configuración</button>
                       </div>
                     </div>
                   </div>
@@ -262,14 +359,19 @@ const AdminPanel = () => {
         </div>
       </div>
 
-      {/* Create User Modal */}
+      {/* Modal: Crear Usuario */}
       {showCreateUser && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="card w-full max-w-md" style={{margin: '1rem'}}>
-            <h2 className="text-xl font-bold mb-4">Crear Nuevo Usuario</h2>
+        <div className="modal-overlay" onClick={() => setShowCreateUser(false)}>
+          <div className="modal-content" onClick={(e) => e.stopPropagation()}>
+            <div className="flex justify-between items-center mb-4">
+              <h3 className="text-xl font-bold">Crear Nuevo Usuario</h3>
+              <button onClick={() => setShowCreateUser(false)} className="p-2 hover:bg-gray-100 rounded">
+                <X className="w-5 h-5" />
+              </button>
+            </div>
             <form onSubmit={handleCreateUser}>
               <div className="mb-4">
-                <label className="block text-sm font-medium mb-2">Nombre</label>
+                <label className="block mb-2 font-medium">Nombre</label>
                 <input
                   type="text"
                   className="input"
@@ -279,7 +381,7 @@ const AdminPanel = () => {
                 />
               </div>
               <div className="mb-4">
-                <label className="block text-sm font-medium mb-2">Email</label>
+                <label className="block mb-2 font-medium">Email</label>
                 <input
                   type="email"
                   className="input"
@@ -288,22 +390,21 @@ const AdminPanel = () => {
                   required
                 />
               </div>
-              <div className="mb-6">
-                <label className="block text-sm font-medium mb-2">Contraseña</label>
+              <div className="mb-4">
+                <label className="block mb-2 font-medium">Contraseña</label>
                 <input
                   type="password"
                   className="input"
                   value={newUser.password}
                   onChange={(e) => setNewUser({...newUser, password: e.target.value})}
                   required
-                  minLength={6}
                 />
               </div>
-              <div className="flex gap-2">
-                <button type="button" onClick={() => setShowCreateUser(false)} className="btn btn-outline flex-1">
+              <div className="flex justify-end gap-2">
+                <button type="button" onClick={() => setShowCreateUser(false)} className="btn btn-secondary">
                   Cancelar
                 </button>
-                <button type="submit" className="btn btn-primary flex-1">
+                <button type="submit" className="btn btn-primary">
                   Crear Usuario
                 </button>
               </div>
@@ -312,53 +413,118 @@ const AdminPanel = () => {
         </div>
       )}
 
-      {/* Create License Modal */}
+      {/* Modal: Crear Licencia */}
       {showCreateLicense && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="card w-full max-w-md" style={{margin: '1rem'}}>
-            <h2 className="text-xl font-bold mb-4">Generar Licencia</h2>
+        <div className="modal-overlay" onClick={() => setShowCreateLicense(false)}>
+          <div className="modal-content" onClick={(e) => e.stopPropagation()}>
+            <div className="flex justify-between items-center mb-4">
+              <h3 className="text-xl font-bold">Generar Nueva Licencia</h3>
+              <button onClick={() => setShowCreateLicense(false)} className="p-2 hover:bg-gray-100 rounded">
+                <X className="w-5 h-5" />
+              </button>
+            </div>
             <form onSubmit={handleCreateLicense}>
               <div className="mb-4">
-                <label className="block text-sm font-medium mb-2">Usuario</label>
+                <label className="block mb-2 font-medium">Usuario</label>
                 <select
                   className="input"
                   value={newLicense.user_id}
                   onChange={(e) => setNewLicense({...newLicense, user_id: e.target.value})}
                   required
                 >
-                  <option value="">Seleccionar usuario...</option>
+                  <option value="">Seleccionar usuario</option>
                   {users.filter(u => u.role !== 'admin').map(u => (
                     <option key={u.id} value={u.id}>{u.name} ({u.email})</option>
                   ))}
                 </select>
               </div>
               <div className="mb-4">
-                <label className="block text-sm font-medium mb-2">Tipo de Plan</label>
+                <label className="block mb-2 font-medium">Tipo de Plan</label>
                 <select
                   className="input"
                   value={newLicense.plan_type}
                   onChange={(e) => setNewLicense({...newLicense, plan_type: e.target.value})}
+                  required
                 >
+                  <option value="free">Free (7 días)</option>
                   <option value="basic">Básico (1 año)</option>
                   <option value="enterprise">Empresa (5 años)</option>
                 </select>
               </div>
-              <div className="mb-6">
-                <label className="block text-sm font-medium mb-2">Duración (días)</label>
+              <div className="mb-4">
+                <label className="block mb-2 font-medium">Duración (días)</label>
                 <input
                   type="number"
                   className="input"
                   value={newLicense.duration_days}
                   onChange={(e) => setNewLicense({...newLicense, duration_days: parseInt(e.target.value)})}
+                  required
                   min="1"
                 />
               </div>
-              <div className="flex gap-2">
-                <button type="button" onClick={() => setShowCreateLicense(false)} className="btn btn-outline flex-1">
+              <div className="flex justify-end gap-2">
+                <button type="button" onClick={() => setShowCreateLicense(false)} className="btn btn-secondary">
                   Cancelar
                 </button>
-                <button type="submit" className="btn btn-primary flex-1">
-                  Generar
+                <button type="submit" className="btn btn-primary">
+                  Generar Licencia
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Modal: Editar Licencia */}
+      {showEditLicense && selectedUser && (
+        <div className="modal-overlay" onClick={() => {setShowEditLicense(false); setSelectedUser(null);}}>
+          <div className="modal-content" onClick={(e) => e.stopPropagation()}>
+            <div className="flex justify-between items-center mb-4">
+              <h3 className="text-xl font-bold">Editar Licencia - {selectedUser.name}</h3>
+              <button onClick={() => {setShowEditLicense(false); setSelectedUser(null);}} className="p-2 hover:bg-gray-100 rounded">
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            <form onSubmit={handleEditLicense}>
+              <div className="mb-4">
+                <label className="block mb-2 font-medium">Usuario</label>
+                <input
+                  type="text"
+                  className="input"
+                  value={`${selectedUser.name} (${selectedUser.email})`}
+                  disabled
+                />
+              </div>
+              <div className="mb-4">
+                <label className="block mb-2 font-medium">Tipo de Plan</label>
+                <select
+                  className="input"
+                  value={editLicense.plan_type}
+                  onChange={(e) => setEditLicense({...editLicense, plan_type: e.target.value})}
+                  required
+                >
+                  <option value="free">Free (7 días)</option>
+                  <option value="basic">Básico (1 año)</option>
+                  <option value="enterprise">Empresa (5 años)</option>
+                </select>
+              </div>
+              <div className="mb-4">
+                <label className="block mb-2 font-medium">Duración (días)</label>
+                <input
+                  type="number"
+                  className="input"
+                  value={editLicense.duration_days}
+                  onChange={(e) => setEditLicense({...editLicense, duration_days: parseInt(e.target.value)})}
+                  required
+                  min="1"
+                />
+              </div>
+              <div className="flex justify-end gap-2">
+                <button type="button" onClick={() => {setShowEditLicense(false); setSelectedUser(null);}} className="btn btn-secondary">
+                  Cancelar
+                </button>
+                <button type="submit" className="btn btn-primary">
+                  Actualizar Licencia
                 </button>
               </div>
             </form>

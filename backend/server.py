@@ -141,10 +141,12 @@ class Conductor(BaseModel):
     model_config = ConfigDict(extra="ignore")
     id: str = Field(default_factory=lambda: str(uuid.uuid4()))
     conductor_type: str
+    voltage_system: str
     size: str
     phases: int
-    fcv: float
-    kva_m: float
+    fcv_kva_m: float  # FCV en kVA-m para el 1% de caída de voltaje
+    resistance_temp: str = "50°C"
+    power_factor: float = 0.90
 
 class Budget(BaseModel):
     model_config = ConfigDict(extra="ignore")
@@ -159,6 +161,15 @@ class Budget(BaseModel):
     iva: float
     total: float
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+
+class Report(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    project_id: str
+    report_type: str  # "autorizacion", "factibilidad", "fiscalizacion"
+    data: Dict[str, Any]
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    updated_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
 def create_token(user_id: str, email: str) -> str:
     payload = {
@@ -485,27 +496,64 @@ async def calculate_demand(data: Dict[str, Any], current_user: User = Depends(ge
 
 @api_router.post("/voltage-drop/calculate")
 async def calculate_voltage_drop(data: Dict[str, Any], current_user: User = Depends(get_current_user)):
+    """
+    Calcula la caída de voltaje con el método mejorado incluyendo FFuc
+    FFuc = Factor de Frecuencia de Uso de la Carga (0.1 a 0.9 p.u)
+    """
     segments = data.get("segments", [])
     circuit_type = data.get("circuit_type", "BT")
     limit = data.get("limit", 3.0)
     
+    # Procesar cada tramo desde el extremo hacia la fuente
     for i in range(len(segments) - 1, -1, -1):
         seg = segments[i]
-        accumulated_kva = sum(s["kva"] for s in segments[i:])
+        
+        # Acumular kVA desde el extremo
+        accumulated_kva = sum(s.get("kva", 0) for s in segments[i:])
         seg["accumulated_kva"] = accumulated_kva
         
+        # Calcular kVA·m o kVA·km
+        length = seg.get("length", 0)
         if circuit_type == "BT":
-            seg["kva_m"] = accumulated_kva * seg["length"]
-        else:
-            seg["kva_km"] = accumulated_kva * (seg["length"] / 1000)
+            seg["kva_m"] = accumulated_kva * length
+        else:  # MT
+            seg["kva_km"] = accumulated_kva * (length / 1000)
         
-        fcv = seg.get("fcv", 1.0)
+        # Obtener FCV del conductor seleccionado desde la base de datos
+        conductor_id = seg.get("conductor_id")
+        fcv_conductor = 1.0  # Valor por defecto
+        
+        if conductor_id:
+            conductor = await db.conductors.find_one({"id": conductor_id}, {"_id": 0})
+            if conductor:
+                fcv_conductor = conductor.get("fcv_kva_m", 1.0)
+        
+        # FFuc - Factor de Frecuencia de Uso de la Carga (por defecto 0.7 si no se especifica)
+        ffuc = seg.get("ffuc", 0.7)
+        if not (0.1 <= ffuc <= 0.9):
+            ffuc = 0.7  # Validar rango
+        
+        # Calcular FCV del tramo
         if circuit_type == "BT":
-            seg["drop_percent"] = (seg["kva_m"] * fcv) / 1000
+            fcv_tramo = seg["kva_m"] * ffuc
+        else:  # MT
+            fcv_tramo = seg["kva_km"] * ffuc
+        
+        seg["fcv_tramo"] = fcv_tramo
+        seg["ffuc"] = ffuc
+        
+        # Calcular % de caída por tramo
+        # % caída = (FCV_tramo / FCV_conductor) * 100
+        if fcv_conductor > 0:
+            if circuit_type == "BT":
+                seg["drop_percent"] = (fcv_tramo / fcv_conductor) * 100
+            else:  # MT
+                seg["drop_percent"] = (fcv_tramo / fcv_conductor) * 100
         else:
-            seg["drop_percent"] = seg["kva_km"] * fcv
+            seg["drop_percent"] = 0
     
-    total_drop = sum(seg["drop_percent"] for seg in segments)
+    # Calcular caída total
+    total_drop = sum(seg.get("drop_percent", 0) for seg in segments)
     compliant = total_drop <= limit
     
     drop_calc = VoltageDrop(
@@ -537,6 +585,112 @@ async def create_material(material: Material, current_user: User = Depends(get_c
 async def get_conductors(current_user: User = Depends(get_current_user)):
     conductors = await db.conductors.find({}, {"_id": 0}).to_list(1000)
     return conductors
+
+# ============ ENDPOINTS PARA CARGAR DATOS GUARDADOS DE MÓDULOS ============
+
+@api_router.get("/demand/load/{project_id}")
+async def load_demand_calculation(project_id: str, current_user: User = Depends(get_current_user)):
+    """Cargar el último cálculo de demanda guardado para un proyecto"""
+    calc = await db.demand_calculations.find_one(
+        {"project_id": project_id},
+        {"_id": 0},
+        sort=[("created_at", -1)]
+    )
+    if calc and isinstance(calc.get("created_at"), str):
+        calc["created_at"] = datetime.fromisoformat(calc["created_at"])
+    return calc if calc else {}
+
+@api_router.get("/voltage-drop/load/{project_id}")
+async def load_voltage_drop(project_id: str, current_user: User = Depends(get_current_user)):
+    """Cargar el último cálculo de caída de voltaje guardado para un proyecto"""
+    calc = await db.voltage_drops.find_one(
+        {"project_id": project_id},
+        {"_id": 0},
+        sort=[("created_at", -1)]
+    )
+    if calc and isinstance(calc.get("created_at"), str):
+        calc["created_at"] = datetime.fromisoformat(calc["created_at"])
+    return calc if calc else {}
+
+@api_router.get("/budget/load/{project_id}")
+async def load_budget(project_id: str, current_user: User = Depends(get_current_user)):
+    """Cargar el último presupuesto guardado para un proyecto"""
+    budget = await db.budgets.find_one(
+        {"project_id": project_id},
+        {"_id": 0},
+        sort=[("created_at", -1)]
+    )
+    if budget and isinstance(budget.get("created_at"), str):
+        budget["created_at"] = datetime.fromisoformat(budget["created_at"])
+    return budget if budget else {}
+
+# ============ ENDPOINTS PARA REPORTES ============
+
+@api_router.post("/reports/save")
+async def save_report(report_data: Dict[str, Any], current_user: User = Depends(get_current_user)):
+    """Guardar o actualizar un reporte"""
+    project_id = report_data.get("project_id")
+    report_type = report_data.get("report_type")
+    data = report_data.get("data", {})
+    
+    if not project_id or not report_type:
+        raise HTTPException(status_code=400, detail="project_id y report_type son requeridos")
+    
+    # Verificar si ya existe un reporte de este tipo para este proyecto
+    existing = await db.reports.find_one({
+        "project_id": project_id,
+        "report_type": report_type
+    })
+    
+    if existing:
+        # Actualizar reporte existente
+        await db.reports.update_one(
+            {"id": existing["id"]},
+            {"$set": {
+                "data": data,
+                "updated_at": datetime.now(timezone.utc).isoformat()
+            }}
+        )
+        return {"success": True, "message": "Reporte actualizado", "id": existing["id"]}
+    else:
+        # Crear nuevo reporte
+        report = Report(
+            project_id=project_id,
+            report_type=report_type,
+            data=data
+        )
+        doc = report.model_dump()
+        doc["created_at"] = doc["created_at"].isoformat()
+        doc["updated_at"] = doc["updated_at"].isoformat()
+        await db.reports.insert_one(doc)
+        return {"success": True, "message": "Reporte creado", "id": report.id}
+
+@api_router.get("/reports/{project_id}")
+async def get_reports(project_id: str, current_user: User = Depends(get_current_user)):
+    """Obtener todos los reportes de un proyecto"""
+    reports = await db.reports.find({"project_id": project_id}, {"_id": 0}).to_list(100)
+    for report in reports:
+        if isinstance(report.get("created_at"), str):
+            report["created_at"] = datetime.fromisoformat(report["created_at"])
+        if isinstance(report.get("updated_at"), str):
+            report["updated_at"] = datetime.fromisoformat(report["updated_at"])
+    return reports
+
+@api_router.get("/reports/{project_id}/{report_type}")
+async def get_report_by_type(project_id: str, report_type: str, current_user: User = Depends(get_current_user)):
+    """Obtener un reporte específico por tipo"""
+    report = await db.reports.find_one({
+        "project_id": project_id,
+        "report_type": report_type
+    }, {"_id": 0})
+    
+    if report:
+        if isinstance(report.get("created_at"), str):
+            report["created_at"] = datetime.fromisoformat(report["created_at"])
+        if isinstance(report.get("updated_at"), str):
+            report["updated_at"] = datetime.fromisoformat(report["updated_at"])
+    
+    return report if report else {}
 
 @api_router.post("/budget/upload-excel")
 async def upload_budget_excel(file: UploadFile = File(...), current_user: User = Depends(get_current_user)):
@@ -755,6 +909,78 @@ async def admin_create_license(
         "license_key": license.license_key,
         "plan_type": plan_type,
         "valid_until": license.end_date
+    }
+
+@api_router.delete("/admin/users/{user_id}")
+async def admin_delete_user(user_id: str, admin: User = Depends(get_current_admin)):
+    """Admin deletes a user"""
+    if user_id == admin.id:
+        raise HTTPException(status_code=400, detail="No puedes eliminarte a ti mismo")
+    
+    user = await db.users.find_one({"id": user_id}, {"_id": 0})
+    if not user:
+        raise HTTPException(status_code=404, detail="Usuario no encontrado")
+    
+    # Delete user's licenses
+    await db.licenses.delete_many({"user_id": user_id})
+    
+    # Delete user's projects and related data
+    projects = await db.projects.find({"user_id": user_id}, {"_id": 0}).to_list(1000)
+    for project in projects:
+        project_id = project["id"]
+        await db.inspections.delete_many({"project_id": project_id})
+        await db.demand_calculations.delete_many({"project_id": project_id})
+        await db.voltage_drops.delete_many({"project_id": project_id})
+        await db.budgets.delete_many({"project_id": project_id})
+        await db.reports.delete_many({"project_id": project_id})
+    
+    await db.projects.delete_many({"user_id": user_id})
+    
+    # Delete user
+    await db.users.delete_one({"id": user_id})
+    
+    return {"success": True, "message": "Usuario eliminado correctamente"}
+
+@api_router.put("/admin/users/{user_id}/license")
+async def admin_update_user_license(
+    user_id: str,
+    plan_type: str = Form(...),
+    duration_days: int = Form(...),
+    admin: User = Depends(get_current_admin)
+):
+    """Admin updates or creates a license for a user"""
+    user = await db.users.find_one({"id": user_id}, {"_id": 0})
+    if not user:
+        raise HTTPException(status_code=404, detail="Usuario no encontrado")
+    
+    # Deactivate old licenses
+    await db.licenses.update_many(
+        {"user_id": user_id},
+        {"$set": {"is_active": False}}
+    )
+    
+    # Create new license
+    license = License(
+        user_id=user_id,
+        plan_type=plan_type,
+        license_key=generate_license_key(),
+        start_date=datetime.now(timezone.utc),
+        end_date=datetime.now(timezone.utc) + timedelta(days=duration_days),
+        is_active=True
+    )
+    
+    doc = license.model_dump()
+    doc["start_date"] = doc["start_date"].isoformat()
+    doc["end_date"] = doc["end_date"].isoformat()
+    doc["created_at"] = doc["created_at"].isoformat()
+    
+    await db.licenses.insert_one(doc)
+    
+    return {
+        "success": True,
+        "license_key": license.license_key,
+        "plan_type": plan_type,
+        "valid_until": doc["end_date"]
     }
 
 @api_router.get("/admin/payment-configs")
