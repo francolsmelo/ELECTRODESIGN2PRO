@@ -1,7 +1,7 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { API } from '../App';
 import { toast } from 'sonner';
-import { Plus, Trash2, DollarSign, FileText, Upload } from 'lucide-react';
+import { Plus, Trash2, DollarSign, FileText, Upload, Save } from 'lucide-react';
 
 const BudgetModule = ({ projectId }) => {
   const [materials, setMaterials] = useState([
@@ -17,6 +17,38 @@ const BudgetModule = ({ projectId }) => {
   const [result, setResult] = useState(null);
   const [generating, setGenerating] = useState(false);
   const [uploadingExcel, setUploadingExcel] = useState(false);
+  const [loading, setLoading] = useState(true);
+
+  // Cargar datos guardados al montar el componente
+  useEffect(() => {
+    loadSavedData();
+  }, [projectId]);
+
+  const loadSavedData = async () => {
+    try {
+      const token = localStorage.getItem('token');
+      const response = await fetch(`${API}/budget/load/${projectId}`, {
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        if (data && data.id) {
+          setMaterials(data.materials || [{ id: 1, description: '', quantity: 0, unit: 'c/u', unit_price: 0 }]);
+          setLabor(data.labor || [{ id: 1, description: '', quantity: 0, unit: 'U', unit_price: 0 }]);
+          setDismantling(data.dismantling || []);
+          setAdminPercent(data.administration || 12);
+          setUtilityPercent(data.utility || 10);
+          setIvaPercent(data.iva || 15);
+          setResult(data);
+        }
+      }
+    } catch (error) {
+      console.error('Error al cargar datos:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const addItem = (setter, items) => {
     setter([...items, {
@@ -68,7 +100,7 @@ const BudgetModule = ({ projectId }) => {
       if (response.ok) {
         const data = await response.json();
         setResult(data);
-        toast.success('Presupuesto generado correctamente');
+        toast.success('Presupuesto generado y guardado correctamente');
       } else {
         toast.error('Error al generar presupuesto');
       }
@@ -124,6 +156,10 @@ const BudgetModule = ({ projectId }) => {
     setUploadingExcel(false);
     e.target.value = ''; // Reset file input
   };
+
+  if (loading) {
+    return <div className="card">Cargando datos guardados...</div>;
+  }
 
   return (
     <div>

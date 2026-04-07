@@ -7,6 +7,7 @@ import InspectionModule from '../modules/InspectionModule';
 import DemandModule from '../modules/DemandModule';
 import VoltageDropModule from '../modules/VoltageDropModule';
 import BudgetModule from '../modules/BudgetModule';
+import ReportsModule from '../modules/ReportsModule';
 
 const ProjectView = () => {
   const { projectId } = useParams();
@@ -107,12 +108,7 @@ const ProjectView = () => {
                 <p style={{color: 'var(--color-text-secondary)'}}>Módulo en desarrollo - próximamente disponible</p>
               </div>
             )}
-            {activeTab === 'reports' && (
-              <div className="card">
-                <h2 className="text-lg font-bold mb-4">Generación de Reportes</h2>
-                <p style={{color: 'var(--color-text-secondary)'}}>Módulo en desarrollo - próximamente disponible</p>
-              </div>
-            )}
+            {activeTab === 'reports' && <ReportsModule projectId={projectId} />}
           </div>
         </div>
       </div>

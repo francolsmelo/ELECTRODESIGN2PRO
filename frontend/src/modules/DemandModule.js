@@ -1,7 +1,7 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { API } from '../App';
 import { toast } from 'sonner';
-import { Plus, Trash2, Calculator } from 'lucide-react';
+import { Plus, Trash2, Calculator, Save } from 'lucide-react';
 
 const DemandModule = ({ projectId }) => {
   const [lightingLoads, setLightingLoads] = useState([
@@ -14,6 +14,36 @@ const DemandModule = ({ projectId }) => {
   const [powerFactor, setPowerFactor] = useState(0.92);
   const [result, setResult] = useState(null);
   const [calculating, setCalculating] = useState(false);
+  const [loading, setLoading] = useState(true);
+
+  // Cargar datos guardados al montar el componente
+  useEffect(() => {
+    loadSavedData();
+  }, [projectId]);
+
+  const loadSavedData = async () => {
+    try {
+      const token = localStorage.getItem('token');
+      const response = await fetch(`${API}/demand/load/${projectId}`, {
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        if (data && data.id) {
+          setLightingLoads(data.lighting_loads || [{ id: 1, description: 'Puntos de alumbrado incandescentes', quantity: 0, unit_power: 100 }]);
+          setSpecialLoads(data.special_loads || [{ id: 1, description: 'Motor', quantity: 0, unit_power: 0 }]);
+          setDemandFactor(data.demand_factor || 0.9);
+          setPowerFactor(data.power_factor || 0.92);
+          setResult(data);
+        }
+      }
+    } catch (error) {
+      console.error('Error al cargar datos:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const addLightingLoad = () => {
     setLightingLoads([...lightingLoads, {
@@ -79,7 +109,7 @@ const DemandModule = ({ projectId }) => {
       if (response.ok) {
         const data = await response.json();
         setResult(data);
-        toast.success('Cálculo completado');
+        toast.success('Cálculo completado y guardado');
       } else {
         toast.error('Error al calcular');
       }
@@ -88,6 +118,10 @@ const DemandModule = ({ projectId }) => {
     }
     setCalculating(false);
   };
+
+  if (loading) {
+    return <div className="card">Cargando datos guardados...</div>;
+  }
 
   return (
     <div>
