@@ -8,6 +8,7 @@ import DemandModule from '../modules/DemandModule';
 import VoltageDropModule from '../modules/VoltageDropModule';
 import BudgetModule from '../modules/BudgetModule';
 import ReportsModule from '../modules/ReportsModule';
+import DatabaseModule from '../modules/DatabaseModule';
 
 const ProjectView = () => {
   const { projectId } = useParams();
@@ -102,12 +103,7 @@ const ProjectView = () => {
             {activeTab === 'demand' && <DemandModule projectId={projectId} />}
             {activeTab === 'voltage' && <VoltageDropModule projectId={projectId} />}
             {activeTab === 'budget' && <BudgetModule projectId={projectId} />}
-            {activeTab === 'database' && (
-              <div className="card">
-                <h2 className="text-lg font-bold mb-4">Base de Datos de Materiales</h2>
-                <p style={{color: 'var(--color-text-secondary)'}}>Módulo en desarrollo - próximamente disponible</p>
-              </div>
-            )}
+            {activeTab === 'database' && <DatabaseModule projectId={projectId} />}
             {activeTab === 'reports' && <ReportsModule projectId={projectId} />}
           </div>
         </div>

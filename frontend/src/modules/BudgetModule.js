@@ -1,7 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { API } from '../App';
 import { toast } from 'sonner';
-import { Plus, Trash2, DollarSign, FileText, Upload, Save } from 'lucide-react';
+import { Plus, Trash2, DollarSign, FileText, Upload, Save, Download } from 'lucide-react';
+import jsPDF from 'jspdf';
+import 'jspdf-autotable';
 
 const BudgetModule = ({ projectId }) => {
   const [materials, setMaterials] = useState([
@@ -156,6 +158,180 @@ const BudgetModule = ({ projectId }) => {
     setUploadingExcel(false);
     e.target.value = ''; // Reset file input
   };
+
+
+  const exportToPDF = () => {
+    if (!result) {
+      toast.error('Primero debes generar el presupuesto');
+      return;
+    }
+
+    const doc = new jsPDF();
+    
+    // Título
+    doc.setFontSize(16);
+    doc.setFont(undefined, 'bold');
+    doc.text('PRESUPUESTO - ANÁLISIS DE PRECIOS UNITARIOS', doc.internal.pageSize.getWidth() / 2, 15, { align: 'center' });
+    
+    doc.setFontSize(10);
+    doc.setFont(undefined, 'normal');
+    doc.text(`Fecha: ${new Date().toLocaleDateString('es-EC')}`, 14, 25);
+    
+    let startY = 35;
+    
+    // Tabla de Materiales
+    if (result.materials && result.materials.length > 0) {
+      doc.setFontSize(12);
+      doc.setFont(undefined, 'bold');
+      doc.text('MATERIALES Y EQUIPOS', 14, startY);
+      startY += 5;
+      
+      const materialsData = result.materials.map(item => [
+        item.description,
+        item.quantity?.toFixed(2) || '0',
+        item.unit || 'c/u',
+        '$' + (item.unit_price?.toFixed(2) || '0.00'),
+        '$' + ((item.quantity * item.unit_price)?.toFixed(2) || '0.00')
+      ]);
+      
+      doc.autoTable({
+        startY: startY,
+        head: [['Descripción', 'Cantidad', 'Unidad', 'P. Unitario', 'Subtotal']],
+        body: materialsData,
+        theme: 'grid',
+        headStyles: { fillColor: [41, 128, 185], textColor: 255, fontStyle: 'bold', fontSize: 9 },
+        bodyStyles: { fontSize: 8 },
+        columnStyles: {
+          0: { cellWidth: 80 },
+          1: { cellWidth: 25 },
+          2: { cellWidth: 20 },
+          3: { cellWidth: 28 },
+          4: { cellWidth: 32 }
+        }
+      });
+      
+      startY = doc.lastAutoTable.finalY + 3;
+      const materialTotal = result.materials.reduce((sum, item) => sum + (item.quantity * item.unit_price), 0);
+      doc.setFont(undefined, 'bold');
+      doc.text(`Subtotal Materiales: $${materialTotal.toFixed(2)}`, 14, startY);
+      startY += 10;
+    }
+    
+    // Tabla de Mano de Obra
+    if (result.labor && result.labor.length > 0) {
+      doc.setFontSize(12);
+      doc.setFont(undefined, 'bold');
+      doc.text('MANO DE OBRA', 14, startY);
+      startY += 5;
+      
+      const laborData = result.labor.map(item => [
+        item.description,
+        item.quantity?.toFixed(2) || '0',
+        item.unit || 'U',
+        '$' + (item.unit_price?.toFixed(2) || '0.00'),
+        '$' + ((item.quantity * item.unit_price)?.toFixed(2) || '0.00')
+      ]);
+      
+      doc.autoTable({
+        startY: startY,
+        head: [['Descripción', 'Cantidad', 'Unidad', 'P. Unitario', 'Subtotal']],
+        body: laborData,
+        theme: 'grid',
+        headStyles: { fillColor: [41, 128, 185], textColor: 255, fontStyle: 'bold', fontSize: 9 },
+        bodyStyles: { fontSize: 8 },
+        columnStyles: {
+          0: { cellWidth: 80 },
+          1: { cellWidth: 25 },
+          2: { cellWidth: 20 },
+          3: { cellWidth: 28 },
+          4: { cellWidth: 32 }
+        }
+      });
+      
+      startY = doc.lastAutoTable.finalY + 3;
+      const laborTotal = result.labor.reduce((sum, item) => sum + (item.quantity * item.unit_price), 0);
+      doc.setFont(undefined, 'bold');
+      doc.text(`Subtotal Mano de Obra: $${laborTotal.toFixed(2)}`, 14, startY);
+      startY += 10;
+    }
+    
+    // Tabla de Desmantelamiento (si existe)
+    if (result.dismantling && result.dismantling.length > 0) {
+      doc.setFontSize(12);
+      doc.setFont(undefined, 'bold');
+      doc.text('DESMANTELAMIENTO', 14, startY);
+      startY += 5;
+      
+      const dismantlingData = result.dismantling.map(item => [
+        item.description,
+        item.quantity?.toFixed(2) || '0',
+        item.unit || 'U',
+        '$' + (item.unit_price?.toFixed(2) || '0.00'),
+        '$' + ((item.quantity * item.unit_price)?.toFixed(2) || '0.00')
+      ]);
+      
+      doc.autoTable({
+        startY: startY,
+        head: [['Descripción', 'Cantidad', 'Unidad', 'P. Unitario', 'Subtotal']],
+        body: dismantlingData,
+        theme: 'grid',
+        headStyles: { fillColor: [41, 128, 185], textColor: 255, fontStyle: 'bold', fontSize: 9 },
+        bodyStyles: { fontSize: 8 },
+        columnStyles: {
+          0: { cellWidth: 80 },
+          1: { cellWidth: 25 },
+          2: { cellWidth: 20 },
+          3: { cellWidth: 28 },
+          4: { cellWidth: 32 }
+        }
+      });
+      
+      startY = doc.lastAutoTable.finalY + 3;
+      const dismantlingTotal = result.dismantling.reduce((sum, item) => sum + (item.quantity * item.unit_price), 0);
+      doc.setFont(undefined, 'bold');
+      doc.text(`Subtotal Desmantelamiento: $${dismantlingTotal.toFixed(2)}`, 14, startY);
+      startY += 10;
+    }
+    
+    // Resumen Ejecutivo
+    doc.addPage();
+    doc.setFontSize(14);
+    doc.setFont(undefined, 'bold');
+    doc.text('RESUMEN EJECUTIVO', doc.internal.pageSize.getWidth() / 2, 20, { align: 'center' });
+    
+    startY = 35;
+    doc.setFontSize(11);
+    
+    const summaryData = [
+      ['Subtotal', `$${result.subtotal?.toFixed(2) || '0.00'}`],
+      [`Administración (${adminPercent}%)`, `$${result.administration?.toFixed(2) || '0.00'}`],
+      [`Utilidad (${utilityPercent}%)`, `$${result.utility?.toFixed(2) || '0.00'}`],
+      [`IVA (${ivaPercent}%)`, `$${result.iva?.toFixed(2) || '0.00'}`],
+      ['TOTAL', `$${result.total?.toFixed(2) || '0.00'}`]
+    ];
+    
+    doc.autoTable({
+      startY: startY,
+      body: summaryData,
+      theme: 'grid',
+      bodyStyles: { fontSize: 11 },
+      columnStyles: {
+        0: { cellWidth: 120, fontStyle: 'bold' },
+        1: { cellWidth: 65, halign: 'right', fontStyle: 'bold' }
+      },
+      didParseCell: (data) => {
+        if (data.row.index === 4) {
+          data.cell.styles.fillColor = [41, 128, 185];
+          data.cell.styles.textColor = 255;
+        }
+      }
+    });
+    
+    // Guardar PDF
+    doc.save(`Presupuesto_${new Date().toISOString().split('T')[0]}.pdf`);
+    toast.success('PDF generado correctamente');
+  };
+
 
   if (loading) {
     return <div className="card">Cargando datos guardados...</div>;
@@ -402,15 +578,27 @@ const BudgetModule = ({ projectId }) => {
           </div>
         </div>
 
-        <button
-          onClick={handleGenerate}
-          disabled={generating}
-          className="btn btn-primary"
-          data-testid="generate-budget-button"
-        >
-          <DollarSign className="w-4 h-4 mr-2 inline" />
-          {generating ? 'Generando...' : 'Generar Presupuesto'}
-        </button>
+        <div className="flex gap-2">
+          <button
+            onClick={handleGenerate}
+            disabled={generating}
+            className="btn btn-primary"
+            data-testid="generate-budget-button"
+          >
+            <DollarSign className="w-4 h-4 mr-2 inline" />
+            {generating ? 'Generando...' : 'Generar Presupuesto'}
+          </button>
+          
+          {result && (
+            <button
+              onClick={exportToPDF}
+              className="btn btn-secondary"
+            >
+              <Download className="w-4 h-4 mr-2 inline" />
+              Exportar a PDF
+            </button>
+          )}
+        </div>
       </div>
 
       {result && (

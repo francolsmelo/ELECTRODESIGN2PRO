@@ -2,6 +2,8 @@ import React, { useState, useEffect } from 'react';
 import { API } from '../App';
 import { toast } from 'sonner';
 import { FileText, Save, Download } from 'lucide-react';
+import jsPDF from 'jspdf';
+import 'jspdf-autotable';
 
 const ReportsModule = ({ projectId }) => {
   const [activeReport, setActiveReport] = useState('autorizacion');
@@ -123,6 +125,218 @@ const ReportsModule = ({ projectId }) => {
     }
     setSaving(false);
   };
+
+
+  const exportAutorizacionPDF = () => {
+    const doc = new jsPDF();
+    
+    // Título principal
+    doc.setFontSize(16);
+    doc.setFont(undefined, 'bold');
+    doc.text('AUTORIZACIÓN DEL PROPIETARIO', doc.internal.pageSize.getWidth() / 2, 20, { align: 'center' });
+    
+    // Fecha
+    doc.setFontSize(11);
+    doc.setFont(undefined, 'normal');
+    const fecha = `${autorizacionData.fecha_ciudad || '[Ciudad]'}, ${autorizacionData.fecha_dia || '[Día]'} de ${autorizacionData.fecha_mes || '[Mes]'} del ${autorizacionData.fecha_anio || '[Año]'}`;
+    doc.text(fecha, doc.internal.pageSize.getWidth() / 2, 35, { align: 'center' });
+    
+    // Cuerpo del documento
+    let startY = 50;
+    const text = [
+      `Yo, ${autorizacionData.firma_propietario || '[Nombre del Propietario]'}, en mi calidad de propietario,`,
+      `por medio de la presente autorizo al Ing. ${autorizacionData.ingeniero_nombre || '[Nombre del Ingeniero]'}`,
+      `para que realice el ${autorizacionData.tipo_servicio || 'diseño'} del proyecto eléctrico denominado:`,
+      '',
+      `"${autorizacionData.nombre_proyecto || '[Nombre del Proyecto]'}"`,
+      '',
+      `Ubicado en: ${autorizacionData.calle_ubicacion || '[Calle y Número]'}`,
+      `Ciudad: ${autorizacionData.ciudad || '[Ciudad]'}`,
+      `Sector: ${autorizacionData.sector || '[Sector/Barrio]'}`,
+      `Provincia: ${autorizacionData.provincia || '[Provincia]'}`,
+      '',
+      'Autorizo además que el profesional antes mencionado gestione los trámites necesarios',
+      'ante la empresa eléctrica de distribución correspondiente.',
+      '',
+      '',
+      'Atentamente,',
+      '',
+      '',
+      '_____________________________',
+      autorizacionData.firma_propietario || '[Nombre y Firma del Propietario]',
+      'Propietario'
+    ];
+    
+    doc.setFontSize(11);
+    text.forEach((line, index) => {
+      if (line === `"${autorizacionData.nombre_proyecto || '[Nombre del Proyecto]'}"`) {
+        doc.setFont(undefined, 'bold');
+        doc.text(line, 14, startY + (index * 7));
+        doc.setFont(undefined, 'normal');
+      } else {
+        doc.text(line, 14, startY + (index * 7));
+      }
+    });
+    
+    doc.save(`Autorizacion_Propietario_${new Date().toISOString().split('T')[0]}.pdf`);
+    toast.success('PDF de Autorización generado correctamente');
+  };
+
+  const exportFactibilidadPDF = () => {
+    const doc = new jsPDF();
+    
+    // Título
+    doc.setFontSize(16);
+    doc.setFont(undefined, 'bold');
+    doc.text('SOLICITUD DE FACTIBILIDAD DE SERVICIO', doc.internal.pageSize.getWidth() / 2, 20, { align: 'center' });
+    
+    // Fecha y destinatario
+    doc.setFontSize(10);
+    doc.setFont(undefined, 'normal');
+    doc.text(`${factibilidadData.canton || '[Cantón]'}, ${factibilidadData.fecha_dia || '[Día]'} de ${factibilidadData.fecha_mes || '[Mes]'} del ${factibilidadData.fecha_anio || '[Año]'}`, 14, 35);
+    doc.text('Señores', 14, 42);
+    doc.text('EMPRESA ELÉCTRICA DE DISTRIBUCIÓN', 14, 47);
+    doc.text('Presente.-', 14, 52);
+    
+    // Cuerpo
+    let startY = 60;
+    doc.setFontSize(10);
+    doc.text('De mi consideración:', 14, startY);
+    startY += 10;
+    
+    const parrafo1 = `Yo, ${factibilidadData.promotor_propietario || '[Nombre del Promotor/Propietario]'}, con RUC/Cédula No. ${factibilidadData.ruc_cedula || '[RUC/Cédula]'}, solicito a ustedes me concedan la FACTIBILIDAD DE SERVICIO para el proyecto "${factibilidadData.nombre_proyecto || '[Nombre del Proyecto]'}".`;
+    
+    const splitText = doc.splitTextToSize(parrafo1, 180);
+    doc.text(splitText, 14, startY);
+    startY += splitText.length * 5 + 10;
+    
+    doc.text('DATOS DEL PROYECTO:', 14, startY);
+    doc.setFont(undefined, 'bold');
+    startY += 7;
+    
+    // Tabla de datos
+    const tableData = [
+      ['Ubicación - Calle Principal:', factibilidadData.calle_principal || ''],
+      ['Calle Secundaria:', factibilidadData.calle_secundaria || ''],
+      ['Parroquia:', factibilidadData.parroquia || ''],
+      ['Cantón:', factibilidadData.canton || ''],
+      ['Sector de Referencia:', factibilidadData.sector_referencia || ''],
+      ['Carga Instalada:', `${factibilidadData.carga_instalada_kw || '0'} kW`],
+      ['Demanda del Proyecto:', `${factibilidadData.demanda_kva || '0'} kVA`],
+      ['Tipo de Instalación:', factibilidadData.tipo_instalacion || ''],
+      ['Número de Fases:', factibilidadData.numero_fases || ''],
+      ['Nivel de Voltaje:', factibilidadData.nivel_voltaje || ''],
+      ['Tipo de Red:', factibilidadData.tipo_red || 'Aérea']
+    ];
+    
+    doc.autoTable({
+      startY: startY,
+      body: tableData,
+      theme: 'plain',
+      styles: { fontSize: 9, cellPadding: 2 },
+      columnStyles: {
+        0: { fontStyle: 'bold', cellWidth: 70 },
+        1: { cellWidth: 115 }
+      }
+    });
+    
+    startY = doc.lastAutoTable.finalY + 10;
+    doc.setFont(undefined, 'normal');
+    doc.text('Particular que comunico a ustedes para los fines pertinentes.', 14, startY);
+    startY += 10;
+    doc.text('Atentamente,', 14, startY);
+    startY += 15;
+    doc.text('_____________________________', 14, startY);
+    startY += 5;
+    doc.text(factibilidadData.promotor_propietario || '[Nombre y Firma]', 14, startY);
+    startY += 5;
+    doc.text(`RUC/Cédula: ${factibilidadData.ruc_cedula || '[RUC/Cédula]'}`, 14, startY);
+    
+    doc.save(`Solicitud_Factibilidad_${new Date().toISOString().split('T')[0]}.pdf`);
+    toast.success('PDF de Factibilidad generado correctamente');
+  };
+
+  const exportFiscalizacionPDF = () => {
+    const doc = new jsPDF();
+    
+    // Título
+    doc.setFontSize(16);
+    doc.setFont(undefined, 'bold');
+    doc.text('SOLICITUD DE FISCALIZACIÓN Y ENERGIZACIÓN', doc.internal.pageSize.getWidth() / 2, 20, { align: 'center' });
+    
+    // Fecha y destinatario
+    doc.setFontSize(10);
+    doc.setFont(undefined, 'normal');
+    const fecha = `${fiscalizacionData.fecha_dia || '[Día]'} de ${fiscalizacionData.fecha_mes || '[Mes]'} del ${fiscalizacionData.fecha_anio || '[Año]'}`;
+    doc.text(fecha, 14, 35);
+    doc.text(`Ingeniero`, 14, 42);
+    doc.text(`${fiscalizacionData.ingeniero_director_nombre || '[Nombre del Ingeniero Director]'}`, 14, 47);
+    doc.text('DIRECTOR DE DISTRIBUCIÓN', 14, 52);
+    doc.text('EMPRESA ELÉCTRICA', 14, 57);
+    doc.text('Presente.-', 14, 62);
+    
+    // Cuerpo
+    let startY = 72;
+    doc.text('De mi consideración:', 14, startY);
+    startY += 10;
+    
+    const text1 = `Mediante la presente, solicito a usted se sirva designar al personal técnico de esa empresa para que realice la FISCALIZACIÓN del proyecto eléctrico:`;
+    const splitText1 = doc.splitTextToSize(text1, 180);
+    doc.text(splitText1, 14, startY);
+    startY += splitText1.length * 5 + 8;
+    
+    doc.setFont(undefined, 'bold');
+    doc.text(`"${fiscalizacionData.proyecto_electrico_nombre || '[Nombre del Proyecto Eléctrico]'}"`, 14, startY);
+    doc.setFont(undefined, 'normal');
+    startY += 10;
+    
+    doc.text('UBICACIÓN DEL PROYECTO:', 14, startY);
+    startY += 6;
+    const ubicacionText = doc.splitTextToSize(fiscalizacionData.proyecto_ubicacion || '[Dirección completa del proyecto]', 180);
+    doc.text(ubicacionText, 14, startY);
+    startY += ubicacionText.length * 5 + 10;
+    
+    const text2 = `Una vez realizada la fiscalización y cumplidos todos los requisitos técnicos y de seguridad, solicito se proceda con la ENERGIZACIÓN del proyecto.`;
+    const splitText2 = doc.splitTextToSize(text2, 180);
+    doc.text(splitText2, 14, startY);
+    startY += splitText2.length * 5 + 10;
+    
+    doc.text('DATOS DEL PROFESIONAL RESPONSABLE:', 14, startY);
+    startY += 8;
+    
+    const datosProf = [
+      ['Nombre:', fiscalizacionData.ingeniero_profesional || ''],
+      ['Dirección:', fiscalizacionData.direccion_profesional || ''],
+      ['Teléfono:', fiscalizacionData.telefono_profesional || ''],
+      ['E-mail:', fiscalizacionData.email_profesional || '']
+    ];
+    
+    doc.autoTable({
+      startY: startY,
+      body: datosProf,
+      theme: 'plain',
+      styles: { fontSize: 9, cellPadding: 2 },
+      columnStyles: {
+        0: { fontStyle: 'bold', cellWidth: 40 },
+        1: { cellWidth: 145 }
+      }
+    });
+    
+    startY = doc.lastAutoTable.finalY + 10;
+    doc.text('Particular que comunico a usted para los fines correspondientes.', 14, startY);
+    startY += 10;
+    doc.text('Atentamente,', 14, startY);
+    startY += 15;
+    doc.text('_____________________________', 14, startY);
+    startY += 5;
+    doc.text(fiscalizacionData.ingeniero_profesional || '[Nombre y Firma del Ingeniero]', 14, startY);
+    startY += 5;
+    doc.text('Ingeniero Eléctrico Responsable', 14, startY);
+    
+    doc.save(`Solicitud_Fiscalizacion_${new Date().toISOString().split('T')[0]}.pdf`);
+    toast.success('PDF de Fiscalización generado correctamente');
+  };
+
 
   if (loading) {
     return <div className="card">Cargando reportes...</div>;
@@ -302,14 +516,23 @@ const ReportsModule = ({ projectId }) => {
               </div>
             </div>
 
-            <button
-              onClick={() => handleSave('autorizacion')}
-              disabled={saving}
-              className="btn btn-primary"
-            >
-              <Save className="w-4 h-4 mr-2 inline" />
-              {saving ? 'Guardando...' : 'Guardar Autorización'}
-            </button>
+            <div className="flex gap-2">
+              <button
+                onClick={() => handleSave('autorizacion')}
+                disabled={saving}
+                className="btn btn-primary"
+              >
+                <Save className="w-4 h-4 mr-2 inline" />
+                {saving ? 'Guardando...' : 'Guardar Autorización'}
+              </button>
+              <button
+                onClick={exportAutorizacionPDF}
+                className="btn btn-secondary"
+              >
+                <Download className="w-4 h-4 mr-2 inline" />
+                Exportar a PDF
+              </button>
+            </div>
           </div>
         </div>
       )}
@@ -538,14 +761,23 @@ const ReportsModule = ({ projectId }) => {
               </div>
             </div>
 
-            <button
-              onClick={() => handleSave('factibilidad')}
-              disabled={saving}
-              className="btn btn-primary"
-            >
-              <Save className="w-4 h-4 mr-2 inline" />
-              {saving ? 'Guardando...' : 'Guardar Solicitud de Factibilidad'}
-            </button>
+            <div className="flex gap-2">
+              <button
+                onClick={() => handleSave('factibilidad')}
+                disabled={saving}
+                className="btn btn-primary"
+              >
+                <Save className="w-4 h-4 mr-2 inline" />
+                {saving ? 'Guardando...' : 'Guardar Solicitud de Factibilidad'}
+              </button>
+              <button
+                onClick={exportFactibilidadPDF}
+                className="btn btn-secondary"
+              >
+                <Download className="w-4 h-4 mr-2 inline" />
+                Exportar a PDF
+              </button>
+            </div>
           </div>
         </div>
       )}
@@ -672,14 +904,23 @@ const ReportsModule = ({ projectId }) => {
               </div>
             </div>
 
-            <button
-              onClick={() => handleSave('fiscalizacion')}
-              disabled={saving}
-              className="btn btn-primary"
-            >
-              <Save className="w-4 h-4 mr-2 inline" />
-              {saving ? 'Guardando...' : 'Guardar Solicitud de Fiscalización'}
-            </button>
+            <div className="flex gap-2">
+              <button
+                onClick={() => handleSave('fiscalizacion')}
+                disabled={saving}
+                className="btn btn-primary"
+              >
+                <Save className="w-4 h-4 mr-2 inline" />
+                {saving ? 'Guardando...' : 'Guardar Solicitud de Fiscalización'}
+              </button>
+              <button
+                onClick={exportFiscalizacionPDF}
+                className="btn btn-secondary"
+              >
+                <Download className="w-4 h-4 mr-2 inline" />
+                Exportar a PDF
+              </button>
+            </div>
           </div>
         </div>
       )}

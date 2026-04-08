@@ -497,8 +497,8 @@ async def calculate_demand(data: Dict[str, Any], current_user: User = Depends(ge
 @api_router.post("/voltage-drop/calculate")
 async def calculate_voltage_drop(data: Dict[str, Any], current_user: User = Depends(get_current_user)):
     """
-    Calcula la caída de voltaje con el método mejorado incluyendo FFuc
-    FFuc = Factor de Frecuencia de Uso de la Carga (0.1 a 0.9 p.u)
+    Calcula la caída de voltaje con el método mejorado incluyendo FFsu y número de conductores
+    FFsu = Factor de Frecuencia de Uso de la Carga (0.1 a 0.9 p.u)
     """
     segments = data.get("segments", [])
     circuit_type = data.get("circuit_type", "BT")
@@ -528,27 +528,36 @@ async def calculate_voltage_drop(data: Dict[str, Any], current_user: User = Depe
             if conductor:
                 fcv_conductor = conductor.get("fcv_kva_m", 1.0)
         
-        # FFuc - Factor de Frecuencia de Uso de la Carga (por defecto 0.7 si no se especifica)
-        ffuc = seg.get("ffuc", 0.7)
-        if not (0.1 <= ffuc <= 0.9):
-            ffuc = 0.7  # Validar rango
+        # FFsu - Factor de Frecuencia de Uso de la Carga (por defecto 0.7 si no se especifica)
+        ffsu = seg.get("ffsu", 0.7)
+        if not (0.1 <= ffsu <= 0.9):
+            ffsu = 0.7  # Validar rango
+        
+        # Número de conductores por fase (reduce la caída de voltaje)
+        num_conductors = seg.get("num_conductors", 1)
+        if num_conductors < 1:
+            num_conductors = 1
         
         # Calcular FCV del tramo
         if circuit_type == "BT":
-            fcv_tramo = seg["kva_m"] * ffuc
+            fcv_tramo = seg["kva_m"] * ffsu
         else:  # MT
-            fcv_tramo = seg["kva_km"] * ffuc
+            fcv_tramo = seg["kva_km"] * ffsu
         
         seg["fcv_tramo"] = fcv_tramo
-        seg["ffuc"] = ffuc
+        seg["ffsu"] = ffsu
+        seg["num_conductors"] = num_conductors
         
         # Calcular % de caída por tramo
-        # % caída = (FCV_tramo / FCV_conductor) * 100
+        # % caída = (FCV_tramo / (FCV_conductor * num_conductors))
+        # NO se multiplica por 100, se deja el valor exacto de la división
         if fcv_conductor > 0:
+            # El número de conductores reduce proporcionalmente la caída
+            effective_fcv = fcv_conductor * num_conductors
             if circuit_type == "BT":
-                seg["drop_percent"] = (fcv_tramo / fcv_conductor) * 100
+                seg["drop_percent"] = fcv_tramo / effective_fcv
             else:  # MT
-                seg["drop_percent"] = (fcv_tramo / fcv_conductor) * 100
+                seg["drop_percent"] = fcv_tramo / effective_fcv
         else:
             seg["drop_percent"] = 0
     

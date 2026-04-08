@@ -1,17 +1,20 @@
 import React, { useState, useEffect } from 'react';
 import { API } from '../App';
 import { toast } from 'sonner';
-import { Plus, Trash2, TrendingDown, CheckCircle, XCircle, Save } from 'lucide-react';
+import { Plus, Trash2, TrendingDown, CheckCircle, XCircle, Save, Download, FileText } from 'lucide-react';
+import jsPDF from 'jspdf';
+import 'jspdf-autotable';
+import * as XLSX from 'xlsx';
 
 const VoltageDropModule = ({ projectId }) => {
   const [conductors, setConductors] = useState([]);
   const [limitBT, setLimitBT] = useState(3.0);
   const [limitMT, setLimitMT] = useState(5.0);
   const [segmentsBT, setSegmentsBT] = useState([
-    { id: 1, ref: '1', length: '', clients: '', kva: '', conductor_id: '', ffuc: 0.7 }
+    { id: 1, ref: '1', length: '', clients: '', kva: '', conductor_id: '', num_conductors: 1, ffsu: 0.7 }
   ]);
   const [segmentsMT, setSegmentsMT] = useState([
-    { id: 1, ref: '1', length: '', transformers: '', kva: '', conductor_id: '', ffuc: 0.7 }
+    { id: 1, ref: '1', length: '', transformers: '', kva: '', conductor_id: '', num_conductors: 1, ffsu: 0.7 }
   ]);
   const [resultBT, setResultBT] = useState(null);
   const [resultMT, setResultMT] = useState(null);
@@ -49,11 +52,11 @@ const VoltageDropModule = ({ projectId }) => {
         const data = await response.json();
         if (data && data.id) {
           if (data.circuit_type === 'BT') {
-            setSegmentsBT(data.segments || [{ id: 1, ref: '1', length: '', clients: '', kva: '', conductor_id: '', ffuc: 0.7 }]);
+            setSegmentsBT(data.segments || [{ id: 1, ref: '1', length: '', clients: '', kva: '', conductor_id: '', num_conductors: 1, ffsu: 0.7 }]);
             setLimitBT(data.limit || 3.0);
             setResultBT(data);
           } else if (data.circuit_type === 'MT') {
-            setSegmentsMT(data.segments || [{ id: 1, ref: '1', length: '', transformers: '', kva: '', conductor_id: '', ffuc: 0.7 }]);
+            setSegmentsMT(data.segments || [{ id: 1, ref: '1', length: '', transformers: '', kva: '', conductor_id: '', num_conductors: 1, ffsu: 0.7 }]);
             setLimitMT(data.limit || 5.0);
             setResultMT(data);
           }
@@ -75,7 +78,8 @@ const VoltageDropModule = ({ projectId }) => {
         clients: '',
         kva: '',
         conductor_id: '',
-        ffuc: 0.7
+        num_conductors: 1,
+        ffsu: 0.7
       }]);
     } else {
       setSegmentsMT([...segmentsMT, {
@@ -85,7 +89,8 @@ const VoltageDropModule = ({ projectId }) => {
         transformers: '',
         kva: '',
         conductor_id: '',
-        ffuc: 0.7
+        num_conductors: 1,
+        ffsu: 0.7
       }]);
     }
   };
@@ -111,16 +116,18 @@ const VoltageDropModule = ({ projectId }) => {
     const segments = circuitType === 'BT' ? segmentsBT : segmentsMT;
     const limit = circuitType === 'BT' ? limitBT : limitMT;
     
-    // Convert string values to numbers and validate FFuc
+    // Convert string values to numbers and validate FFsu
     const processedSegments = segments.map(seg => {
-      const ffuc = parseFloat(seg.ffuc) || 0.7;
+      const ffsu = parseFloat(seg.ffsu) || 0.7;
+      const numConductors = parseInt(seg.num_conductors) || 1;
       return {
         ...seg,
         length: parseFloat(seg.length) || 0,
         clients: parseInt(seg.clients) || 0,
         transformers: parseInt(seg.transformers) || 0,
         kva: parseFloat(seg.kva) || 0,
-        ffuc: Math.min(Math.max(ffuc, 0.1), 0.9) // Ensure FFuc is between 0.1 and 0.9
+        num_conductors: numConductors,
+        ffsu: Math.min(Math.max(ffsu, 0.1), 0.9) // Ensure FFsu is between 0.1 and 0.9
       };
     });
     
@@ -156,6 +163,130 @@ const VoltageDropModule = ({ projectId }) => {
     }
     setCalculating(false);
   };
+
+  const exportToPDF = (circuitType) => {
+    const result = circuitType === 'BT' ? resultBT : resultMT;
+    if (!result) {
+      toast.error('No hay datos para exportar');
+      return;
+    }
+
+    const doc = new jsPDF();
+    
+    // Título
+    doc.setFontSize(16);
+    doc.setFont(undefined, 'bold');
+    doc.text('CÓMPUTO DE CAÍDAS DE VOLTAJE', doc.internal.pageSize.getWidth() / 2, 15, { align: 'center' });
+    
+    doc.setFontSize(12);
+    doc.text(`CIRCUITOS ${circuitType === 'BT' ? 'SECUNDARIOS (BAJA TENSIÓN)' : 'PRIMARIOS (MEDIA TENSIÓN)'}`, doc.internal.pageSize.getWidth() / 2, 22, { align: 'center' });
+    
+    // Información general
+    doc.setFontSize(10);
+    doc.setFont(undefined, 'normal');
+    const startY = 30;
+    doc.text(`LÍMITE DE CAÍDA DE VOLTAJE: ${result.limit}%`, 14, startY);
+    doc.text(`Fecha: ${new Date().toLocaleDateString('es-EC')}`, 14, startY + 6);
+    
+    // Tabla de datos
+    const tableData = result.segments.map(seg => [
+      seg.ref,
+      seg.length?.toFixed(2) || '0',
+      circuitType === 'BT' ? (seg.clients || 0) : (seg.transformers || 0),
+      seg.kva?.toFixed(2) || '0',
+      seg.num_conductors || 1,
+      seg.ffsu?.toFixed(2) || '0.70',
+      seg.accumulated_kva?.toFixed(2) || '0',
+      circuitType === 'BT' ? (seg.kva_m?.toFixed(2) || '0') : (seg.kva_km?.toFixed(2) || '0'),
+      seg.fcv_tramo?.toFixed(4) || '0',
+      ((seg.drop_percent || 0) * 100).toFixed(3) + '%'
+    ]);
+    
+    doc.autoTable({
+      startY: startY + 12,
+      head: [[
+        'Ref.',
+        'Long. (m)',
+        circuitType === 'BT' ? 'Clientes' : 'Transf.',
+        'kVA',
+        'N° Cond.',
+        'FFsu',
+        'kVA Acum.',
+        circuitType === 'BT' ? 'kVA·m' : 'kVA·km',
+        'FCV Tramo',
+        '% Caída'
+      ]],
+      body: tableData,
+      theme: 'grid',
+      headStyles: { fillColor: [41, 128, 185], textColor: 255, fontStyle: 'bold', fontSize: 8 },
+      bodyStyles: { fontSize: 8 },
+      columnStyles: {
+        0: { cellWidth: 15 },
+        1: { cellWidth: 20 },
+        2: { cellWidth: 20 },
+        3: { cellWidth: 18 },
+        4: { cellWidth: 15 },
+        5: { cellWidth: 15 },
+        6: { cellWidth: 20 },
+        7: { cellWidth: 20 },
+        8: { cellWidth: 22 },
+        9: { cellWidth: 20 }
+      }
+    });
+    
+    // Resultado final
+    const finalY = doc.lastAutoTable.finalY + 10;
+    doc.setFontSize(11);
+    doc.setFont(undefined, 'bold');
+    doc.text(`CAÍDA TOTAL: ${(result.total_drop * 100).toFixed(3)}%`, 14, finalY);
+    doc.text(`RESULTADO: ${result.compliant ? 'CUMPLE' : 'NO CUMPLE'}`, 14, finalY + 7);
+    
+    // Guardar PDF
+    doc.save(`Caída_Voltaje_${circuitType}_${new Date().toISOString().split('T')[0]}.pdf`);
+    toast.success('PDF generado correctamente');
+  };
+
+  const exportToExcel = (circuitType) => {
+    const result = circuitType === 'BT' ? resultBT : resultMT;
+    if (!result) {
+      toast.error('No hay datos para exportar');
+      return;
+    }
+
+    const data = result.segments.map(seg => ({
+      'Referencia': seg.ref,
+      'Longitud (m)': seg.length,
+      [circuitType === 'BT' ? 'Clientes' : 'Transformadores']: circuitType === 'BT' ? seg.clients : seg.transformers,
+      'kVA': seg.kva,
+      'N° Conductores': seg.num_conductors,
+      'FFsu (p.u.)': seg.ffsu,
+      'kVA Acumulado': seg.accumulated_kva?.toFixed(2),
+      [circuitType === 'BT' ? 'kVA·m' : 'kVA·km']: circuitType === 'BT' ? seg.kva_m?.toFixed(2) : seg.kva_km?.toFixed(2),
+      'FCV Tramo': seg.fcv_tramo?.toFixed(4),
+      '% Caída': ((seg.drop_percent || 0) * 100).toFixed(3) + '%'
+    }));
+    
+    // Agregar fila de totales
+    data.push({
+      'Referencia': '',
+      'Longitud (m)': '',
+      [circuitType === 'BT' ? 'Clientes' : 'Transformadores']: '',
+      'kVA': '',
+      'N° Conductores': '',
+      'FFsu (p.u.)': '',
+      'kVA Acumulado': '',
+      [circuitType === 'BT' ? 'kVA·m' : 'kVA·km']: 'TOTAL',
+      'FCV Tramo': '',
+      '% Caída': ((result.total_drop || 0) * 100).toFixed(3) + '%'
+    });
+    
+    const ws = XLSX.utils.json_to_sheet(data);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, `Caída ${circuitType}`);
+    XLSX.writeFile(wb, `Caída_Voltaje_${circuitType}_${new Date().toISOString().split('T')[0]}.xlsx`);
+    toast.success('Excel generado correctamente');
+  };
+
 
   if (loading) {
     return <div className="card">Cargando datos guardados...</div>;
@@ -200,7 +331,8 @@ const VoltageDropModule = ({ projectId }) => {
                   <th>Clientes</th>
                   <th>kVA</th>
                   <th>Conductor</th>
-                  <th>FFuc (p.u.)</th>
+                  <th>N° Cond.</th>
+                  <th>FFsu (p.u.)</th>
                   <th></th>
                 </tr>
               </thead>
@@ -257,8 +389,20 @@ const VoltageDropModule = ({ projectId }) => {
                       <input
                         type="number"
                         className="input mono"
-                        value={seg.ffuc}
-                        onChange={(e) => updateSegment('BT', seg.id, 'ffuc', e.target.value)}
+                        value={seg.num_conductors}
+                        onChange={(e) => updateSegment('BT', seg.id, 'num_conductors', e.target.value)}
+                        placeholder="1"
+                        min="1"
+                        max="4"
+                        title="Número de conductores por fase"
+                      />
+                    </td>
+                    <td>
+                      <input
+                        type="number"
+                        className="input mono"
+                        value={seg.ffsu}
+                        onChange={(e) => updateSegment('BT', seg.id, 'ffsu', e.target.value)}
                         placeholder="0.7"
                         step="0.1"
                         min="0.1"
@@ -282,14 +426,35 @@ const VoltageDropModule = ({ projectId }) => {
           </div>
         </div>
 
-        <button
-          onClick={() => handleCalculate('BT')}
-          disabled={calculating}
-          className="btn btn-primary"
-        >
-          <TrendingDown className="w-4 h-4 mr-2 inline" />
-          {calculating ? 'Calculando...' : 'Calcular Caída BT'}
-        </button>
+        <div className="flex gap-2">
+          <button
+            onClick={() => handleCalculate('BT')}
+            disabled={calculating}
+            className="btn btn-primary"
+          >
+            <TrendingDown className="w-4 h-4 mr-2 inline" />
+            {calculating ? 'Calculando...' : 'Calcular Caída BT'}
+          </button>
+          
+          {resultBT && (
+            <>
+              <button
+                onClick={() => exportToPDF('BT')}
+                className="btn btn-secondary"
+              >
+                <FileText className="w-4 h-4 mr-2 inline" />
+                Exportar a PDF
+              </button>
+              <button
+                onClick={() => exportToExcel('BT')}
+                className="btn btn-secondary"
+              >
+                <Download className="w-4 h-4 mr-2 inline" />
+                Exportar a Excel
+              </button>
+            </>
+          )}
+        </div>
 
         {resultBT && (
           <div className="mt-6">
@@ -313,14 +478,14 @@ const VoltageDropModule = ({ projectId }) => {
                       <td className="mono">{seg.accumulated_kva?.toFixed(2)}</td>
                       <td className="mono">{seg.kva_m?.toFixed(2)}</td>
                       <td className="mono">{seg.fcv_tramo?.toFixed(4)}</td>
-                      <td className="mono font-semibold">{seg.drop_percent?.toFixed(3)}%</td>
+                      <td className="mono font-semibold">{(seg.drop_percent * 100)?.toFixed(3)}%</td>
                     </tr>
                   ))}
                 </tbody>
                 <tfoot>
                   <tr style={{backgroundColor: resultBT.compliant ? '#D1FAE5' : '#FEE2E2'}}>
                     <td colSpan="4" className="font-bold">Caída Total</td>
-                    <td className="mono font-bold">{resultBT.total_drop?.toFixed(3)}%</td>
+                    <td className="mono font-bold">{(resultBT.total_drop * 100)?.toFixed(3)}%</td>
                   </tr>
                 </tfoot>
               </table>
@@ -337,7 +502,7 @@ const VoltageDropModule = ({ projectId }) => {
                   {resultBT.compliant ? '✓ Cumple con el límite' : '✗ No cumple con el límite'}
                 </p>
                 <p className="text-sm" style={{color: 'var(--color-text-secondary)'}}>
-                  Límite: {resultBT.limit}% | Caída: {resultBT.total_drop?.toFixed(3)}%
+                  Límite: {resultBT.limit}% | Caída: {(resultBT.total_drop * 100)?.toFixed(3)}%
                 </p>
               </div>
             </div>
@@ -382,7 +547,8 @@ const VoltageDropModule = ({ projectId }) => {
                   <th>Transformadores</th>
                   <th>kVA</th>
                   <th>Conductor</th>
-                  <th>FFuc (p.u.)</th>
+                  <th>N° Cond.</th>
+                  <th>FFsu (p.u.)</th>
                   <th></th>
                 </tr>
               </thead>
@@ -439,8 +605,20 @@ const VoltageDropModule = ({ projectId }) => {
                       <input
                         type="number"
                         className="input mono"
-                        value={seg.ffuc}
-                        onChange={(e) => updateSegment('MT', seg.id, 'ffuc', e.target.value)}
+                        value={seg.num_conductors}
+                        onChange={(e) => updateSegment('MT', seg.id, 'num_conductors', e.target.value)}
+                        placeholder="1"
+                        min="1"
+                        max="4"
+                        title="Número de conductores por fase"
+                      />
+                    </td>
+                    <td>
+                      <input
+                        type="number"
+                        className="input mono"
+                        value={seg.ffsu}
+                        onChange={(e) => updateSegment('MT', seg.id, 'ffsu', e.target.value)}
                         placeholder="0.7"
                         step="0.1"
                         min="0.1"
@@ -464,14 +642,35 @@ const VoltageDropModule = ({ projectId }) => {
           </div>
         </div>
 
-        <button
-          onClick={() => handleCalculate('MT')}
-          disabled={calculating}
-          className="btn btn-primary"
-        >
-          <TrendingDown className="w-4 h-4 mr-2 inline" />
-          {calculating ? 'Calculando...' : 'Calcular Caída MT'}
-        </button>
+        <div className="flex gap-2">
+          <button
+            onClick={() => handleCalculate('MT')}
+            disabled={calculating}
+            className="btn btn-primary"
+          >
+            <TrendingDown className="w-4 h-4 mr-2 inline" />
+            {calculating ? 'Calculando...' : 'Calcular Caída MT'}
+          </button>
+          
+          {resultMT && (
+            <>
+              <button
+                onClick={() => exportToPDF('MT')}
+                className="btn btn-secondary"
+              >
+                <FileText className="w-4 h-4 mr-2 inline" />
+                Exportar a PDF
+              </button>
+              <button
+                onClick={() => exportToExcel('MT')}
+                className="btn btn-secondary"
+              >
+                <Download className="w-4 h-4 mr-2 inline" />
+                Exportar a Excel
+              </button>
+            </>
+          )}
+        </div>
 
         {resultMT && (
           <div className="mt-6">
@@ -502,7 +701,7 @@ const VoltageDropModule = ({ projectId }) => {
                 <tfoot>
                   <tr style={{backgroundColor: resultMT.compliant ? '#D1FAE5' : '#FEE2E2'}}>
                     <td colSpan="4" className="font-bold">Caída Total</td>
-                    <td className="mono font-bold">{resultMT.total_drop?.toFixed(3)}%</td>
+                    <td className="mono font-bold">{(resultMT.total_drop * 100)?.toFixed(3)}%</td>
                   </tr>
                 </tfoot>
               </table>
@@ -519,7 +718,7 @@ const VoltageDropModule = ({ projectId }) => {
                   {resultMT.compliant ? '✓ Cumple con el límite' : '✗ No cumple con el límite'}
                 </p>
                 <p className="text-sm" style={{color: 'var(--color-text-secondary)'}}>
-                  Límite: {resultMT.limit}% | Caída: {resultMT.total_drop?.toFixed(3)}%
+                  Límite: {resultMT.limit}% | Caída: {(resultMT.total_drop * 100)?.toFixed(3)}%
                 </p>
               </div>
             </div>
