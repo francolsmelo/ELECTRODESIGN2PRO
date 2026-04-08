@@ -219,60 +219,65 @@ CREATE INDEX idx_inspections_project_id ON inspections(project_id);
       </div>
 
       <div className="space-y-6">
-        <div className="p-4 rounded" style={{backgroundColor: 'var(--color-bg-main)'}}>
-          <h3 className="font-semibold mb-2">Información del Sistema</h3>
-          <p className="text-sm mb-2" style={{color: 'var(--color-text-secondary)'}}>
-            ElectroDesign Pro utiliza MongoDB como base de datos NoSQL para almacenar:
-          </p>
-          <ul className="text-sm space-y-1 ml-4" style={{color: 'var(--color-text-secondary)'}}>
-            <li>• Usuarios y licencias</li>
-            <li>• Proyectos eléctricos</li>
-            <li>• Cálculos de demanda</li>
-            <li>• Análisis de caída de voltaje</li>
-            <li>• Presupuestos (APU)</li>
-            <li>• Reportes oficiales</li>
-            <li>• Conductores y materiales</li>
-          </ul>
-        </div>
-
         {user?.role === 'admin' ? (
-          <div className="space-y-4">
-            <div className="p-4 rounded border-2" style={{borderColor: 'var(--color-success)', backgroundColor: '#f0fdf4'}}>
-              <div className="flex items-center gap-2 mb-2">
-                <Shield className="w-5 h-5 text-green-600" />
-                <h3 className="font-semibold text-green-800">Acceso Administrativo</h3>
-              </div>
-              <p className="text-sm text-green-700 mb-3">
-                Como administrador, puedes exportar el esquema de la base de datos en formato SQL.
+          <>
+            <div className="p-4 rounded" style={{backgroundColor: 'var(--color-bg-main)'}}>
+              <h3 className="font-semibold mb-2">Información del Sistema</h3>
+              <p className="text-sm mb-2" style={{color: 'var(--color-text-secondary)'}}>
+                ElectroDesign Pro utiliza MongoDB como base de datos NoSQL para almacenar:
               </p>
-              <p className="text-xs text-green-600 mb-4">
-                El archivo SQL generado contiene la estructura completa de tablas, índices y relaciones.
-                Úsalo para documentación, análisis o como referencia para integraciones externas.
-              </p>
-              <button
-                onClick={generateSQL}
-                disabled={generating}
-                className="btn btn-primary"
-              >
-                <Download className="w-4 h-4 mr-2 inline" />
-                {generating ? 'Generando...' : 'Descargar Esquema SQL'}
-              </button>
+              <ul className="text-sm space-y-1 ml-4" style={{color: 'var(--color-text-secondary)'}}>
+                <li>• Usuarios y licencias</li>
+                <li>• Proyectos eléctricos</li>
+                <li>• Cálculos de demanda</li>
+                <li>• Análisis de caída de voltaje</li>
+                <li>• Presupuestos (APU)</li>
+                <li>• Reportes oficiales</li>
+                <li>• Conductores y materiales</li>
+              </ul>
             </div>
 
-            <div className="p-3 rounded" style={{backgroundColor: '#fef3c7'}}>
-              <p className="text-xs" style={{color: '#92400e'}}>
-                <strong>Nota:</strong> La base de datos en producción es MongoDB (NoSQL). 
-                El archivo SQL es una representación relacional equivalente para análisis estructurado.
-              </p>
+            <div className="space-y-4">
+              <div className="p-4 rounded border-2" style={{borderColor: 'var(--color-success)', backgroundColor: '#f0fdf4'}}>
+                <div className="flex items-center gap-2 mb-2">
+                  <Shield className="w-5 h-5 text-green-600" />
+                  <h3 className="font-semibold text-green-800">Acceso Administrativo</h3>
+                </div>
+                <p className="text-sm text-green-700 mb-3">
+                  Como administrador, puedes exportar el esquema de la base de datos en formato SQL.
+                </p>
+                <p className="text-xs text-green-600 mb-4">
+                  El archivo SQL generado contiene la estructura completa de tablas, índices y relaciones.
+                  Úsalo para documentación, análisis o como referencia para integraciones externas.
+                </p>
+                <button
+                  onClick={generateSQL}
+                  disabled={generating}
+                  className="btn btn-primary"
+                >
+                  <Download className="w-4 h-4 mr-2 inline" />
+                  {generating ? 'Generando...' : 'Descargar Esquema SQL'}
+                </button>
+              </div>
+
+              <div className="p-3 rounded" style={{backgroundColor: '#fef3c7'}}>
+                <p className="text-xs" style={{color: '#92400e'}}>
+                  <strong>Nota:</strong> La base de datos en producción es MongoDB (NoSQL). 
+                  El archivo SQL es una representación relacional equivalente para análisis estructurado.
+                </p>
+              </div>
             </div>
-          </div>
+          </>
         ) : (
-          <div className="p-4 rounded border" style={{borderColor: 'var(--color-border)', backgroundColor: 'var(--color-bg-main)'}}>
-            <p className="text-sm" style={{color: 'var(--color-text-secondary)'}}>
-              La gestión de la base de datos está restringida a usuarios administradores.
-            </p>
-            <p className="text-xs mt-2" style={{color: 'var(--color-text-secondary)'}}>
-              Contacta al administrador del sistema si necesitas acceso a funciones de base de datos.
+          <div className="flex flex-col items-center justify-center py-12">
+            <div className="mb-6 p-8 rounded-full" style={{backgroundColor: 'var(--color-bg-main)'}}>
+              <Database className="w-24 h-24" style={{color: 'var(--color-primary)'}} />
+            </div>
+            <h3 className="text-xl font-bold mb-2" style={{color: 'var(--color-primary)'}}>
+              ElectroDesign Pro
+            </h3>
+            <p className="text-sm text-center" style={{color: 'var(--color-text-secondary)'}}>
+              Sistema profesional de diseño eléctrico
             </p>
           </div>
         )}

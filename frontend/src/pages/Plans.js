@@ -1,13 +1,15 @@
 import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { API } from '../App';
 import { toast } from 'sonner';
-import { Check, CreditCard, Shield } from 'lucide-react';
+import { Check, CreditCard, Shield, ArrowLeft } from 'lucide-react';
 
 const Plans = () => {
   const [plans, setPlans] = useState([]);
   const [loading, setLoading] = useState(true);
   const [selectedPlan, setSelectedPlan] = useState(null);
   const [processing, setProcessing] = useState(false);
+  const navigate = useNavigate();
 
   useEffect(() => {
     fetchPlans();
@@ -64,6 +66,13 @@ const Plans = () => {
   return (
     <div className="min-h-screen" style={{backgroundColor: 'var(--color-bg-main)', padding: '2rem'}}>
       <div className="max-w-6xl mx-auto">
+        <div className="mb-6">
+          <button onClick={() => navigate('/dashboard')} className="flex items-center gap-2 btn btn-secondary">
+            <ArrowLeft className="w-4 h-4" />
+            Regresar al Dashboard
+          </button>
+        </div>
+        
         <div className="text-center mb-12">
           <h1 className="text-4xl font-bold mb-4" style={{color: 'var(--color-primary)'}}>
             Planes de ElectroDesign Pro

@@ -12,10 +12,12 @@ const AdminPanel = () => {
   const [showCreateUser, setShowCreateUser] = useState(false);
   const [showCreateLicense, setShowCreateLicense] = useState(false);
   const [showEditLicense, setShowEditLicense] = useState(false);
+  const [showChangeCredentials, setShowChangeCredentials] = useState(false);
   const [selectedUser, setSelectedUser] = useState(null);
   const [newUser, setNewUser] = useState({ name: '', email: '', password: '' });
   const [newLicense, setNewLicense] = useState({ user_id: '', plan_type: 'basic', duration_days: 365 });
   const [editLicense, setEditLicense] = useState({ plan_type: 'basic', duration_days: 365 });
+  const [credentialsForm, setCredentialsForm] = useState({ current_password: '', new_email: '', new_password: '', confirm_password: '' });
   const { user } = useContext(AuthContext);
   const navigate = useNavigate();
 
@@ -189,6 +191,64 @@ const AdminPanel = () => {
     setShowEditLicense(true);
   };
 
+
+  const handleChangeCredentials = async (e) => {
+    e.preventDefault();
+    
+    if (!credentialsForm.current_password) {
+      toast.error('Debes ingresar tu contraseña actual');
+      return;
+    }
+    
+    if (!credentialsForm.new_email && !credentialsForm.new_password) {
+      toast.error('Debes proporcionar un nuevo email o contraseña');
+      return;
+    }
+    
+    if (credentialsForm.new_password && credentialsForm.new_password !== credentialsForm.confirm_password) {
+      toast.error('Las contraseñas nuevas no coinciden');
+      return;
+    }
+
+    try {
+      const token = localStorage.getItem('token');
+      const formData = new FormData();
+      formData.append('current_password', credentialsForm.current_password);
+      if (credentialsForm.new_email) formData.append('new_email', credentialsForm.new_email);
+      if (credentialsForm.new_password) formData.append('new_password', credentialsForm.new_password);
+
+      const response = await fetch(`${API}/admin/update-credentials`, {
+        method: 'PUT',
+        headers: {
+          'Authorization': `Bearer ${token}`
+        },
+        body: formData
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        if (data.new_token) {
+          localStorage.setItem('token', data.new_token);
+        }
+        toast.success('Credenciales actualizadas correctamente');
+        setShowChangeCredentials(false);
+        setCredentialsForm({ current_password: '', new_email: '', new_password: '', confirm_password: '' });
+        
+        if (data.new_token) {
+          setTimeout(() => {
+            window.location.reload();
+          }, 1500);
+        }
+      } else {
+        const errorData = await response.json();
+        toast.error(errorData.detail || 'Error al actualizar credenciales');
+      }
+    } catch (error) {
+      toast.error('Error de conexión');
+    }
+  };
+
+
   return (
     <div className="min-h-screen" style={{backgroundColor: 'var(--color-bg-main)'}}>
       <div className="top-header">
@@ -232,6 +292,13 @@ const AdminPanel = () => {
             >
               <Settings className="w-4 h-4" />
               Configuración de Pagos
+            </button>
+            <button
+              onClick={() => setShowChangeCredentials(true)}
+              className="w-full flex items-center gap-3 px-3 py-2 rounded mb-1 text-sm hover:bg-gray-50 text-blue-600"
+            >
+              <Shield className="w-4 h-4" />
+              Mi Perfil
             </button>
           </div>
         </div>
@@ -531,6 +598,70 @@ const AdminPanel = () => {
           </div>
         </div>
       )}
+
+
+      {/* Modal: Cambiar Credenciales */}
+      {showChangeCredentials && (
+        <div className="modal-overlay" onClick={() => setShowChangeCredentials(false)}>
+          <div className="modal-content" onClick={(e) => e.stopPropagation()}>
+            <div className="flex justify-between items-center mb-4">
+              <h3 className="text-xl font-bold">Cambiar Mis Credenciales</h3>
+              <button onClick={() => setShowChangeCredentials(false)} className="p-2 hover:bg-gray-100 rounded">
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            <form onSubmit={handleChangeCredentials}>
+              <div className="mb-4">
+                <label className="block mb-2 font-medium">Contraseña Actual *</label>
+                <input
+                  type="password"
+                  className="input"
+                  value={credentialsForm.current_password}
+                  onChange={(e) => setCredentialsForm({...credentialsForm, current_password: e.target.value})}
+                  required
+                />
+              </div>
+              <div className="mb-4">
+                <label className="block mb-2 font-medium">Nuevo Email (opcional)</label>
+                <input
+                  type="email"
+                  className="input"
+                  value={credentialsForm.new_email}
+                  onChange={(e) => setCredentialsForm({...credentialsForm, new_email: e.target.value})}
+                  placeholder={user?.email}
+                />
+              </div>
+              <div className="mb-4">
+                <label className="block mb-2 font-medium">Nueva Contraseña (opcional)</label>
+                <input
+                  type="password"
+                  className="input"
+                  value={credentialsForm.new_password}
+                  onChange={(e) => setCredentialsForm({...credentialsForm, new_password: e.target.value})}
+                />
+              </div>
+              <div className="mb-4">
+                <label className="block mb-2 font-medium">Confirmar Nueva Contraseña</label>
+                <input
+                  type="password"
+                  className="input"
+                  value={credentialsForm.confirm_password}
+                  onChange={(e) => setCredentialsForm({...credentialsForm, confirm_password: e.target.value})}
+                />
+              </div>
+              <div className="flex justify-end gap-2">
+                <button type="button" onClick={() => setShowChangeCredentials(false)} className="btn btn-secondary">
+                  Cancelar
+                </button>
+                <button type="submit" className="btn btn-primary">
+                  Actualizar Credenciales
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
     </div>
   );
 };

@@ -1007,6 +1007,54 @@ async def admin_update_user_license(
         "valid_until": doc["end_date"]
     }
 
+@api_router.put("/admin/update-credentials")
+async def admin_update_credentials(
+    current_password: str = Form(...),
+    new_email: str = Form(None),
+    new_password: str = Form(None),
+    admin: User = Depends(get_current_admin)
+):
+    """Admin actualiza sus propias credenciales"""
+    # Verificar contraseña actual
+    if not bcrypt.checkpw(current_password.encode('utf-8'), admin.password.encode('utf-8')):
+        raise HTTPException(status_code=400, detail="Contraseña actual incorrecta")
+    
+    update_fields = {}
+    
+    # Actualizar email si se proporciona
+    if new_email and new_email != admin.email:
+        # Verificar que el nuevo email no esté en uso
+        existing = await db.users.find_one({"email": new_email, "id": {"$ne": admin.id}})
+        if existing:
+            raise HTTPException(status_code=400, detail="El email ya está en uso")
+        update_fields["email"] = new_email
+    
+    # Actualizar contraseña si se proporciona
+    if new_password:
+        salt = bcrypt.gensalt()
+        hashed = bcrypt.hashpw(new_password.encode('utf-8'), salt)
+        update_fields["password"] = hashed.decode('utf-8')
+    
+    if not update_fields:
+        raise HTTPException(status_code=400, detail="No se proporcionaron cambios")
+    
+    # Actualizar en base de datos
+    await db.users.update_one(
+        {"id": admin.id},
+        {"$set": update_fields}
+    )
+    
+    # Generar nuevo token si cambió el email
+    new_token = None
+    if "email" in update_fields:
+        new_token = create_token(admin.id, new_email)
+    
+    return {
+        "success": True,
+        "message": "Credenciales actualizadas correctamente",
+        "new_token": new_token
+    }
+
 @api_router.get("/admin/payment-configs")
 async def admin_get_payment_configs(admin: User = Depends(get_current_admin)):
     """Get all payment configurations"""
