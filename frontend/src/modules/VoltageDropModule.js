@@ -3,7 +3,7 @@ import { API } from '../App';
 import { toast } from 'sonner';
 import { Plus, Trash2, TrendingDown, CheckCircle, XCircle, Save, Download, FileText } from 'lucide-react';
 import jsPDF from 'jspdf';
-import 'jspdf-autotable';
+import autoTable from 'jspdf-autotable';
 import * as XLSX from 'xlsx';
 
 const VoltageDropModule = ({ projectId }) => {
@@ -11,10 +11,10 @@ const VoltageDropModule = ({ projectId }) => {
   const [limitBT, setLimitBT] = useState(3.0);
   const [limitMT, setLimitMT] = useState(5.0);
   const [segmentsBT, setSegmentsBT] = useState([
-    { id: 1, ref: '1', length: '', clients: '', kva: '', conductor_id: '', num_conductors: 1, ffsu: 0.7 }
+    { id: 1, ref: '1', length: '', clients: '', kva: '', kva_per_client: false, conductor_id: '', num_conductors: 1, ffsu: 0.7 }
   ]);
   const [segmentsMT, setSegmentsMT] = useState([
-    { id: 1, ref: '1', length: '', transformers: '', kva: '', conductor_id: '', num_conductors: 1, ffsu: 0.7 }
+    { id: 1, ref: '1', length: '', transformers: '', kva: '', kva_per_client: false, conductor_id: '', num_conductors: 1, ffsu: 0.7 }
   ]);
   const [resultBT, setResultBT] = useState(null);
   const [resultMT, setResultMT] = useState(null);
@@ -52,11 +52,11 @@ const VoltageDropModule = ({ projectId }) => {
         const data = await response.json();
         if (data && data.id) {
           if (data.circuit_type === 'BT') {
-            setSegmentsBT(data.segments || [{ id: 1, ref: '1', length: '', clients: '', kva: '', conductor_id: '', num_conductors: 1, ffsu: 0.7 }]);
+            setSegmentsBT(data.segments || [{ id: 1, ref: '1', length: '', clients: '', kva: '', kva_per_client: false, conductor_id: '', num_conductors: 1, ffsu: 0.7 }]);
             setLimitBT(data.limit || 3.0);
             setResultBT(data);
           } else if (data.circuit_type === 'MT') {
-            setSegmentsMT(data.segments || [{ id: 1, ref: '1', length: '', transformers: '', kva: '', conductor_id: '', num_conductors: 1, ffsu: 0.7 }]);
+            setSegmentsMT(data.segments || [{ id: 1, ref: '1', length: '', transformers: '', kva: '', kva_per_client: false, conductor_id: '', num_conductors: 1, ffsu: 0.7 }]);
             setLimitMT(data.limit || 5.0);
             setResultMT(data);
           }
@@ -77,6 +77,7 @@ const VoltageDropModule = ({ projectId }) => {
         length: '',
         clients: '',
         kva: '',
+        kva_per_client: false,
         conductor_id: '',
         num_conductors: 1,
         ffsu: 0.7
@@ -88,6 +89,7 @@ const VoltageDropModule = ({ projectId }) => {
         length: '',
         transformers: '',
         kva: '',
+        kva_per_client: false,
         conductor_id: '',
         num_conductors: 1,
         ffsu: 0.7
@@ -330,6 +332,7 @@ const VoltageDropModule = ({ projectId }) => {
                   <th>Long. (m)</th>
                   <th>Clientes</th>
                   <th>kVA</th>
+                  <th>kVA x Cliente</th>
                   <th>Conductor</th>
                   <th>N° Cond.</th>
                   <th>FFsu (p.u.)</th>
@@ -369,6 +372,14 @@ const VoltageDropModule = ({ projectId }) => {
                         placeholder="0"
                         step="0.01"
                         min="0"
+                      />
+                    </td>
+                    <td className="text-center">
+                      <input
+                        type="checkbox"
+                        checked={seg.kva_per_client || false}
+                        onChange={(e) => updateSegment('BT', seg.id, 'kva_per_client', e.target.checked)}
+                        title="Si está marcado, kVA se multiplicará por número de clientes"
                       />
                     </td>
                     <td>
@@ -546,6 +557,7 @@ const VoltageDropModule = ({ projectId }) => {
                   <th>Long. (m)</th>
                   <th>Transformadores</th>
                   <th>kVA</th>
+                  <th>kVA x Transf</th>
                   <th>Conductor</th>
                   <th>N° Cond.</th>
                   <th>FFsu (p.u.)</th>
@@ -585,6 +597,14 @@ const VoltageDropModule = ({ projectId }) => {
                         placeholder="0"
                         step="0.01"
                         min="0"
+                      />
+                    </td>
+                    <td className="text-center">
+                      <input
+                        type="checkbox"
+                        checked={seg.kva_per_client || false}
+                        onChange={(e) => updateSegment('MT', seg.id, 'kva_per_client', e.target.checked)}
+                        title="Si está marcado, kVA se multiplicará por número de transformadores"
                       />
                     </td>
                     <td>

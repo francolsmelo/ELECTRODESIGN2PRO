@@ -3,7 +3,7 @@ import { API } from '../App';
 import { toast } from 'sonner';
 import { FileText, Save, Download } from 'lucide-react';
 import jsPDF from 'jspdf';
-import 'jspdf-autotable';
+import autoTable from 'jspdf-autotable';
 
 const ReportsModule = ({ projectId }) => {
   const [activeReport, setActiveReport] = useState('autorizacion');

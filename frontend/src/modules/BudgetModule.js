@@ -3,7 +3,7 @@ import { API } from '../App';
 import { toast } from 'sonner';
 import { Plus, Trash2, DollarSign, FileText, Upload, Save, Download } from 'lucide-react';
 import jsPDF from 'jspdf';
-import 'jspdf-autotable';
+import autoTable from 'jspdf-autotable';
 
 const BudgetModule = ({ projectId }) => {
   const [materials, setMaterials] = useState([

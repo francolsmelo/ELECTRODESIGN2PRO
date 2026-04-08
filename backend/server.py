@@ -508,8 +508,25 @@ async def calculate_voltage_drop(data: Dict[str, Any], current_user: User = Depe
     for i in range(len(segments) - 1, -1, -1):
         seg = segments[i]
         
+        # Determinar kVA real del tramo
+        kva_input = seg.get("kva", 0)
+        kva_per_client = seg.get("kva_per_client", False)
+        
+        if circuit_type == "BT":
+            num_items = seg.get("clients", 0)
+        else:  # MT
+            num_items = seg.get("transformers", 0)
+        
+        # Si kva_per_client está activado, multiplicar kVA por número de clientes/transformadores
+        if kva_per_client and num_items > 0:
+            kva_real = kva_input * num_items
+        else:
+            kva_real = kva_input
+        
+        seg["kva_real"] = kva_real
+        
         # Acumular kVA desde el extremo
-        accumulated_kva = sum(s.get("kva", 0) for s in segments[i:])
+        accumulated_kva = sum(s.get("kva_real", 0) for s in segments[i:])
         seg["accumulated_kva"] = accumulated_kva
         
         # Calcular kVA·m o kVA·km
@@ -538,26 +555,24 @@ async def calculate_voltage_drop(data: Dict[str, Any], current_user: User = Depe
         if num_conductors < 1:
             num_conductors = 1
         
-        # Calcular FCV del tramo
+        # Calcular FCV del tramo (NO es necesario multiplicar por FFsu aquí)
         if circuit_type == "BT":
-            fcv_tramo = seg["kva_m"] * ffsu
+            fcv_tramo = seg["kva_m"]
         else:  # MT
-            fcv_tramo = seg["kva_km"] * ffsu
+            fcv_tramo = seg["kva_km"]
         
         seg["fcv_tramo"] = fcv_tramo
         seg["ffsu"] = ffsu
         seg["num_conductors"] = num_conductors
         
         # Calcular % de caída por tramo
-        # % caída = (FCV_tramo / (FCV_conductor * num_conductors))
-        # NO se multiplica por 100, se deja el valor exacto de la división
-        if fcv_conductor > 0:
-            # El número de conductores reduce proporcionalmente la caída
+        # Fórmula correcta: (kVA·m × FFsu) / (FCV_conductor × num_conductors)
+        # NO multiplicar por 100, dejar valor exacto
+        if fcv_conductor > 0 and num_conductors > 0:
+            # El número de conductores multiplica el FCV efectivo (divisor más grande = menos caída)
             effective_fcv = fcv_conductor * num_conductors
-            if circuit_type == "BT":
-                seg["drop_percent"] = fcv_tramo / effective_fcv
-            else:  # MT
-                seg["drop_percent"] = fcv_tramo / effective_fcv
+            # FFsu se multiplica al numerador (frecuencia de uso afecta la carga)
+            seg["drop_percent"] = (fcv_tramo * ffsu) / effective_fcv
         else:
             seg["drop_percent"] = 0
     
