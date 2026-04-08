@@ -253,11 +253,11 @@ const Plans = () => {
               <div className="mb-6 p-4 rounded" style={{backgroundColor: 'var(--color-bg-main)'}}>
                 <h4 className="font-bold mb-3">Datos Bancarios - Banco Pichincha (Ecuador)</h4>
                 <div className="space-y-2 text-sm">
-                  <p><strong>Beneficiario:</strong> ElectroDesign Pro</p>
+                  <p><strong>Beneficiario:</strong> Franklin Roberto Melo López</p>
                   <p><strong>RUC:</strong> 1234567890001</p>
                   <p><strong>Banco:</strong> Banco Pichincha</p>
-                  <p><strong>Tipo de Cuenta:</strong> Corriente</p>
-                  <p><strong>Número de Cuenta:</strong> 2100123456</p>
+                  <p><strong>Tipo de Cuenta:</strong> Transaccional</p>
+                  <p><strong>Número de Cuenta:</strong> 4409606500</p>
                   <p><strong>Plan seleccionado:</strong> {transferData.plan_id}</p>
                   <p className="text-lg font-bold" style={{color: 'var(--color-primary)'}}>
                     Monto a transferir: ${plans.find(p => p.name === transferData.plan_id)?.price || 0}

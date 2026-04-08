@@ -172,7 +172,7 @@ const DemandModule = ({ projectId }) => {
         }
       });
       
-      startY = doc.previousAutoTable.finalY + 3;
+      startY = doc.lastAutoTable.finalY + 3;
       doc.setFont(undefined, 'bold');
       doc.text(`Subtotal Alumbrado: ${result.total_lighting_kw.toFixed(2)} kW`, 14, startY);
       startY += 10;
@@ -209,7 +209,7 @@ const DemandModule = ({ projectId }) => {
         }
       });
       
-      startY = doc.previousAutoTable.finalY + 3;
+      startY = doc.lastAutoTable.finalY + 3;
       doc.setFont(undefined, 'bold');
       doc.text(`Subtotal Cargas Especiales: ${result.total_special_kw.toFixed(2)} kW`, 14, startY);
       startY += 10;

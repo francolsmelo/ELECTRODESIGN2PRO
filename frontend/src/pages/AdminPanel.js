@@ -410,10 +410,10 @@ const AdminPanel = () => {
                       <p className="text-sm mb-2" style={{color: 'var(--color-success)'}}>✓ Configurado y activo</p>
                       <div className="space-y-3 mb-4">
                         <div className="p-3 rounded" style={{backgroundColor: 'var(--color-bg-main)'}}>
-                          <p className="text-sm"><strong>Beneficiario:</strong> ElectroDesign Pro</p>
+                          <p className="text-sm"><strong>Beneficiario:</strong> Franklin Roberto Melo López</p>
                           <p className="text-sm"><strong>RUC:</strong> 1234567890001</p>
-                          <p className="text-sm"><strong>Tipo de Cuenta:</strong> Corriente</p>
-                          <p className="text-sm"><strong>Número de Cuenta:</strong> 2100123456</p>
+                          <p className="text-sm"><strong>Tipo de Cuenta:</strong> Transaccional</p>
+                          <p className="text-sm"><strong>Número de Cuenta:</strong> 4409606500</p>
                         </div>
                       </div>
                       <p className="text-xs" style={{color: 'var(--color-text-secondary)'}}>

@@ -237,7 +237,7 @@ const VoltageDropModule = ({ projectId }) => {
     });
     
     // Resultado final
-    const finalY = doc.previousAutoTable.finalY + 10;
+    const finalY = doc.lastAutoTable.finalY + 10;
     doc.setFontSize(11);
     doc.setFont(undefined, 'bold');
     doc.text(`CAÍDA TOTAL: ${(result.total_drop * 100).toFixed(3)}%`, 14, finalY);
