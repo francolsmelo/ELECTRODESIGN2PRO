@@ -407,16 +407,18 @@ const AdminPanel = () => {
                     
                     <div className="card">
                       <h3 className="font-bold mb-4">Banco Pichincha (Ecuador)</h3>
-                      <p className="text-sm mb-4" style={{color: 'var(--color-text-secondary)'}}>
-                        Configuración pendiente - Solicitar credenciales al equipo del banco
-                      </p>
-                      <div className="space-y-3">
-                        <input type="text" className="input" placeholder="Nombre de Aplicación" disabled />
-                        <input type="text" className="input" placeholder="Client ID" disabled />
-                        <input type="text" className="input" placeholder="Client Secret" disabled />
-                        <input type="text" className="input" placeholder="Access Token" disabled />
-                        <button className="btn btn-secondary" disabled>Guardar Configuración</button>
+                      <p className="text-sm mb-2" style={{color: 'var(--color-success)'}}>✓ Configurado y activo</p>
+                      <div className="space-y-3 mb-4">
+                        <div className="p-3 rounded" style={{backgroundColor: 'var(--color-bg-main)'}}>
+                          <p className="text-sm"><strong>Beneficiario:</strong> ElectroDesign Pro</p>
+                          <p className="text-sm"><strong>RUC:</strong> 1234567890001</p>
+                          <p className="text-sm"><strong>Tipo de Cuenta:</strong> Corriente</p>
+                          <p className="text-sm"><strong>Número de Cuenta:</strong> 2100123456</p>
+                        </div>
                       </div>
+                      <p className="text-xs" style={{color: 'var(--color-text-secondary)'}}>
+                        Los pagos por transferencia requieren activación manual de la licencia
+                      </p>
                     </div>
                   </div>
                 </div>

@@ -1247,6 +1247,60 @@ async def capture_payment_order(
     
     raise HTTPException(status_code=400, detail="Pago no completado")
 
+
+@api_router.post("/payment/bank-transfer")
+async def bank_transfer_payment(
+    plan_id: str = Form(...),
+    reference: str = Form(...),
+    file: UploadFile = File(...),
+    current_user: User = Depends(get_current_user)
+):
+    """Process bank transfer payment - requires manual activation"""
+    plans = {
+        "basic": {"price": 100, "days": 365},
+        "enterprise": {"price": 200, "days": 1825}
+    }
+    
+    if plan_id not in plans:
+        raise HTTPException(status_code=400, detail="Plan inválido")
+    
+    # Save file
+    import os
+    os.makedirs("uploads/bank_transfers", exist_ok=True)
+    file_path = f"uploads/bank_transfers/{current_user.id}_{reference}_{file.filename}"
+    
+    with open(file_path, "wb") as f:
+        content = await file.read()
+        f.write(content)
+    
+    # Create pending license (admin must activate it)
+    license = License(
+        user_id=current_user.id,
+        plan_type=plan_id,
+        license_key=generate_license_key(),
+        start_date=datetime.now(timezone.utc),
+        end_date=datetime.now(timezone.utc) + timedelta(days=plans[plan_id]["days"]),
+        is_active=False,  # Requires manual activation
+        payment_id=f"BANK_TRANSFER_{reference}",
+        amount_paid=plans[plan_id]["price"]
+    )
+    
+    doc = license.model_dump()
+    doc["start_date"] = doc["start_date"].isoformat()
+    doc["end_date"] = doc["end_date"].isoformat()
+    doc["created_at"] = doc["created_at"].isoformat()
+    doc["bank_transfer_file"] = file_path
+    doc["bank_transfer_reference"] = reference
+    
+    await db.licenses.insert_one(doc)
+    
+    return {
+        "success": True,
+        "message": "Comprobante recibido. Tu licencia será activada en 24-48 horas.",
+        "license_key": license.license_key
+    }
+
+
 app.include_router(api_router)
 
 app.add_middleware(

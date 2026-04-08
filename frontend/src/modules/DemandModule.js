@@ -1,7 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { API } from '../App';
 import { toast } from 'sonner';
-import { Plus, Trash2, Calculator, Save } from 'lucide-react';
+import { Plus, Trash2, Calculator, Save, Download, FileText } from 'lucide-react';
+import jsPDF from 'jspdf';
+import autoTable from 'jspdf-autotable';
 
 const DemandModule = ({ projectId }) => {
   const [lightingLoads, setLightingLoads] = useState([
@@ -118,6 +120,140 @@ const DemandModule = ({ projectId }) => {
     }
     setCalculating(false);
   };
+
+
+  const exportToPDF = () => {
+    if (!result) {
+      toast.error('Primero debes calcular la demanda');
+      return;
+    }
+
+    const doc = new jsPDF();
+    
+    // Título
+    doc.setFontSize(16);
+    doc.setFont(undefined, 'bold');
+    doc.text('CÁLCULO DE LA DEMANDA ELÉCTRICA', doc.internal.pageSize.getWidth() / 2, 15, { align: 'center' });
+    
+    doc.setFontSize(10);
+    doc.setFont(undefined, 'normal');
+    doc.text(`Fecha: ${new Date().toLocaleDateString('es-EC')}`, 14, 25);
+    
+    let startY = 35;
+    
+    // Tabla de Cargas de Alumbrado
+    if (result.lighting_loads && result.lighting_loads.length > 0) {
+      doc.setFontSize(12);
+      doc.setFont(undefined, 'bold');
+      doc.text('CARGAS DE ALUMBRADO Y TOMACORRIENTES', 14, startY);
+      startY += 5;
+      
+      const lightingData = result.lighting_loads.map((load, idx) => [
+        idx + 1,
+        load.description,
+        load.quantity,
+        load.unit_power + ' W',
+        (load.quantity * load.unit_power).toFixed(2) + ' W'
+      ]);
+      
+      autoTable(doc, {
+        startY: startY,
+        head: [['Ítem', 'Descripción', 'Cantidad', 'Pn (W)', 'Total (W)']],
+        body: lightingData,
+        theme: 'grid',
+        headStyles: { fillColor: [41, 128, 185], textColor: 255, fontStyle: 'bold', fontSize: 9 },
+        bodyStyles: { fontSize: 8 },
+        columnStyles: {
+          0: { cellWidth: 15 },
+          1: { cellWidth: 70 },
+          2: { cellWidth: 25 },
+          3: { cellWidth: 25 },
+          4: { cellWidth: 30 }
+        }
+      });
+      
+      startY = doc.lastAutoTable.finalY + 3;
+      doc.setFont(undefined, 'bold');
+      doc.text(`Subtotal Alumbrado: ${result.total_lighting_kw.toFixed(2)} kW`, 14, startY);
+      startY += 10;
+    }
+    
+    // Tabla de Cargas Especiales
+    if (result.special_loads && result.special_loads.length > 0) {
+      doc.setFontSize(12);
+      doc.setFont(undefined, 'bold');
+      doc.text('CARGAS ESPECIALES', 14, startY);
+      startY += 5;
+      
+      const specialData = result.special_loads.map((load, idx) => [
+        idx + 1,
+        load.description,
+        load.quantity,
+        load.unit_power + ' W',
+        (load.quantity * load.unit_power).toFixed(2) + ' W'
+      ]);
+      
+      autoTable(doc, {
+        startY: startY,
+        head: [['Ítem', 'Descripción', 'Cantidad', 'Pn (W)', 'Total (W)']],
+        body: specialData,
+        theme: 'grid',
+        headStyles: { fillColor: [41, 128, 185], textColor: 255, fontStyle: 'bold', fontSize: 9 },
+        bodyStyles: { fontSize: 8 },
+        columnStyles: {
+          0: { cellWidth: 15 },
+          1: { cellWidth: 70 },
+          2: { cellWidth: 25 },
+          3: { cellWidth: 25 },
+          4: { cellWidth: 30 }
+        }
+      });
+      
+      startY = doc.lastAutoTable.finalY + 3;
+      doc.setFont(undefined, 'bold');
+      doc.text(`Subtotal Cargas Especiales: ${result.total_special_kw.toFixed(2)} kW`, 14, startY);
+      startY += 10;
+    }
+    
+    // Resumen de Cálculo
+    doc.addPage();
+    doc.setFontSize(14);
+    doc.setFont(undefined, 'bold');
+    doc.text('RESULTADOS DEL CÁLCULO', doc.internal.pageSize.getWidth() / 2, 20, { align: 'center' });
+    
+    startY = 35;
+    doc.setFontSize(11);
+    
+    const summaryData = [
+      ['Potencia Total Instalada', `${result.total_installed_kw.toFixed(2)} kW`],
+      ['Factor de Demanda', `${(result.demand_factor * 100).toFixed(0)}%`],
+      ['Factor de Potencia', `${(result.power_factor * 100).toFixed(0)}%`],
+      ['Demanda Calculada', `${result.demanded_kva.toFixed(2)} kVA`],
+      ['Transformador Recomendado', `${result.transformer_size_kva} kVA`]
+    ];
+    
+    autoTable(doc, {
+      startY: startY,
+      body: summaryData,
+      theme: 'grid',
+      bodyStyles: { fontSize: 11 },
+      columnStyles: {
+        0: { cellWidth: 120, fontStyle: 'bold' },
+        1: { cellWidth: 65, halign: 'right', fontStyle: 'bold' }
+      },
+      didParseCell: (data) => {
+        if (data.row.index === 4) {
+          data.cell.styles.fillColor = [41, 128, 185];
+          data.cell.styles.textColor = 255;
+        }
+      }
+    });
+    
+    // Guardar PDF
+    doc.save(`Calculo_Demanda_${new Date().toISOString().split('T')[0]}.pdf`);
+    toast.success('PDF generado correctamente');
+  };
+
 
   if (loading) {
     return <div className="card">Cargando datos guardados...</div>;
@@ -312,15 +448,27 @@ const DemandModule = ({ projectId }) => {
           </div>
         </div>
 
-        <button
-          onClick={handleCalculate}
-          disabled={calculating}
-          className="btn btn-primary"
-          data-testid="calculate-demand-button"
-        >
-          <Calculator className="w-4 h-4 mr-2 inline" />
-          {calculating ? 'Calculando...' : 'Calcular Demanda'}
-        </button>
+        <div className="flex gap-2">
+          <button
+            onClick={handleCalculate}
+            disabled={calculating}
+            className="btn btn-primary"
+            data-testid="calculate-demand-button"
+          >
+            <Calculator className="w-4 h-4 mr-2 inline" />
+            {calculating ? 'Calculando...' : 'Calcular Demanda'}
+          </button>
+          
+          {result && (
+            <button
+              onClick={exportToPDF}
+              className="btn btn-secondary"
+            >
+              <FileText className="w-4 h-4 mr-2 inline" />
+              Exportar a PDF
+            </button>
+          )}
+        </div>
       </div>
 
       {result && (

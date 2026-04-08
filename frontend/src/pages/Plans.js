@@ -1,15 +1,17 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { API } from '../App';
 import { toast } from 'sonner';
-import { Check, CreditCard, Shield, ArrowLeft } from 'lucide-react';
+import { Check, CreditCard, Shield, ArrowLeft, Building, Upload, X } from 'lucide-react';
 
 const Plans = () => {
   const [plans, setPlans] = useState([]);
   const [loading, setLoading] = useState(true);
   const [selectedPlan, setSelectedPlan] = useState(null);
-  const [processing, setProcessing] = useState(false);
+  const [showBankTransfer, setShowBankTransfer] = useState(false);
+  const [transferData, setTransferData] = useState({ plan_id: '', file: null, reference: '' });
   const navigate = useNavigate();
+  const paypalRefs = useRef({});
 
   useEffect(() => {
     fetchPlans();
@@ -18,49 +20,134 @@ const Plans = () => {
   const fetchPlans = async () => {
     try {
       const response = await fetch(`${API}/plans`);
-      const data = await response.json();
-      setPlans(data);
-      setLoading(false);
+      if (response.ok) {
+        const data = await response.json();
+        setPlans(data);
+      }
     } catch (error) {
       toast.error('Error al cargar planes');
-      setLoading(false);
     }
+    setLoading(false);
   };
 
-  const handleSelectPlan = async (planId) => {
-    if (planId === 'free') {
-      toast.info('El plan Free se activa automáticamente al registrarse');
+  const initPayPalButton = (planId, price) => {
+    if (!window.paypal) {
+      console.error('PayPal SDK no cargado');
       return;
     }
 
-    setSelectedPlan(planId);
-    setProcessing(true);
+    if (paypalRefs.current[planId]) {
+      paypalRefs.current[planId].innerHTML = '';
+    }
+
+    window.paypal.Buttons({
+      style: {
+        shape: 'rect',
+        color: 'blue',
+        layout: 'vertical',
+        label: 'paypal'
+      },
+      createOrder: async () => {
+        try {
+          const token = localStorage.getItem('token');
+          const response = await fetch(`${API}/payment/create-order`, {
+            method: 'POST',
+            headers: {
+              'Authorization': `Bearer ${token}`,
+              'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({ plan_id: planId })
+          });
+
+          if (!response.ok) {
+            const error = await response.json();
+            throw new Error(error.detail || 'Error al crear orden');
+          }
+
+          const data = await response.json();
+          return data.order_id;
+        } catch (error) {
+          toast.error(error.message || 'Error al procesar');
+          throw error;
+        }
+      },
+      onApprove: async (data) => {
+        try {
+          const token = localStorage.getItem('token');
+          const formData = new FormData();
+          formData.append('order_id', data.orderID);
+          formData.append('plan_id', planId);
+
+          const response = await fetch(`${API}/payment/capture-order`, {
+            method: 'POST',
+            headers: {
+              'Authorization': `Bearer ${token}`
+            },
+            body: formData
+          });
+
+          if (response.ok) {
+            toast.success('¡Pago completado con éxito! Tu licencia ha sido activada');
+            setTimeout(() => navigate('/dashboard'), 2000);
+          } else {
+            const error = await response.json();
+            toast.error(error.detail || 'Error al procesar el pago');
+          }
+        } catch (error) {
+          toast.error('Error de conexión');
+        }
+      },
+      onError: (err) => {
+        console.error('PayPal error:', err);
+        toast.error('Error en el proceso de pago');
+      }
+    }).render(paypalRefs.current[planId]);
+  };
+
+  const handleBankTransfer = (planId) => {
+    setTransferData({ ...transferData, plan_id: planId });
+    setShowBankTransfer(true);
+  };
+
+  const handleFileChange = (e) => {
+    if (e.target.files && e.target.files[0]) {
+      setTransferData({ ...transferData, file: e.target.files[0] });
+    }
+  };
+
+  const submitBankTransfer = async (e) => {
+    e.preventDefault();
+    
+    if (!transferData.file) {
+      toast.error('Debes subir el comprobante de pago');
+      return;
+    }
 
     try {
       const token = localStorage.getItem('token');
-      const response = await fetch(`${API}/payment/create-order`, {
+      const formData = new FormData();
+      formData.append('plan_id', transferData.plan_id);
+      formData.append('reference', transferData.reference);
+      formData.append('file', transferData.file);
+
+      const response = await fetch(`${API}/payment/bank-transfer`, {
         method: 'POST',
         headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
+          'Authorization': `Bearer ${token}`
         },
-        body: JSON.stringify({ plan_id: planId })
+        body: formData
       });
 
       if (response.ok) {
-        const data = await response.json();
-        // Redirect to PayPal
-        window.location.href = data.approval_url;
+        toast.success('Comprobante enviado. Tu licencia será activada en 24-48 horas.');
+        setShowBankTransfer(false);
+        setTimeout(() => navigate('/dashboard'), 2000);
       } else {
-        const errorData = await response.json();
-        toast.error(errorData.detail || 'Error al procesar el pago');
-        console.error('Payment error:', errorData);
+        toast.error('Error al enviar comprobante');
       }
     } catch (error) {
-      console.error('Payment error:', error);
       toast.error('Error de conexión');
     }
-    setProcessing(false);
   };
 
   return (
@@ -83,80 +170,145 @@ const Plans = () => {
         </div>
 
         {loading ? (
-          <p className="text-center">Cargando planes...</p>
+          <div className="text-center">Cargando planes...</div>
         ) : (
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+          <div className="grid md:grid-cols-3 gap-8 mb-12">
             {plans.map(plan => (
-              <div
-                key={plan.id}
-                className="card relative"
-                style={{
-                  padding: '2rem',
-                  border: plan.id === 'basic' ? '2px solid var(--color-secondary)' : '1px solid var(--color-border)'
-                }}
+              <div 
+                key={plan.name} 
+                className={`card ${plan.name === 'basic' ? 'border-2' : ''}`}
+                style={{borderColor: plan.name === 'basic' ? 'var(--color-primary)' : undefined}}
               >
-                {plan.id === 'basic' && (
-                  <div
-                    className="absolute top-0 left-0 right-0 text-center py-2 text-white text-sm font-semibold"
-                    style={{backgroundColor: 'var(--color-secondary)'}}
-                  >
-                    MÁS POPULAR
+                {plan.name === 'basic' && (
+                  <div className="mb-4 text-center">
+                    <span className="px-3 py-1 rounded-full text-xs font-bold" style={{backgroundColor: 'var(--color-primary)', color: 'white'}}>
+                      MÁS POPULAR
+                    </span>
                   </div>
                 )}
                 
-                <div style={{marginTop: plan.id === 'basic' ? '2rem' : '0'}}>
-                  <h3 className="text-2xl font-bold mb-2" style={{color: 'var(--color-primary)'}}>{plan.name}</h3>
-                  <div className="mb-4">
-                    <span className="text-4xl font-bold" style={{color: 'var(--color-secondary)'}}>${plan.price}</span>
-                    <span className="text-sm" style={{color: 'var(--color-text-secondary)'}}>
-                      {plan.id === 'free' ? ' / semana' : plan.id === 'basic' ? ' / año' : ' / 5 años'}
-                    </span>
+                <div className="text-center mb-6">
+                  <Shield className="w-12 h-12 mx-auto mb-4" style={{color: 'var(--color-primary)'}} />
+                  <h3 className="text-2xl font-bold mb-2 capitalize">{plan.name}</h3>
+                  <div className="text-4xl font-bold mb-2" style={{color: 'var(--color-primary)'}}>
+                    ${plan.price}
                   </div>
-                  <p className="mb-6" style={{color: 'var(--color-text-secondary)'}}>{plan.description}</p>
-                  
-                  <div className="mb-6 space-y-3">
-                    <div className="flex items-center gap-2">
-                      <Check className="w-5 h-5" style={{color: 'var(--color-success)'}} />
-                      <span className="text-sm">Todos los módulos incluidos</span>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <Check className="w-5 h-5" style={{color: 'var(--color-success)'}} />
-                      <span className="text-sm">Cálculos ilimitados</span>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <Check className="w-5 h-5" style={{color: 'var(--color-success)'}} />
-                      <span className="text-sm">Soporte técnico</span>
-                    </div>
-                    {plan.id !== 'free' && (
-                      <div className="flex items-center gap-2">
-                        <Shield className="w-5 h-5" style={{color: 'var(--color-secondary)'}} />
-                        <span className="text-sm font-semibold">Certificado de licencia</span>
-                      </div>
-                    )}
-                  </div>
-                  
-                  <button
-                    onClick={() => handleSelectPlan(plan.id)}
-                    disabled={processing && selectedPlan === plan.id}
-                    className={`btn w-full ${plan.id === 'free' ? 'btn-outline' : 'btn-primary'}`}
-                    data-testid={`select-plan-${plan.id}`}
-                  >
-                    <CreditCard className="w-4 h-4 mr-2 inline" />
-                    {processing && selectedPlan === plan.id ? 'Procesando...' : 
-                     plan.id === 'free' ? 'Plan Actual' : 'Comprar Ahora'}
-                  </button>
+                  <p className="text-sm" style={{color: 'var(--color-text-secondary)'}}>
+                    {plan.description}
+                  </p>
                 </div>
+
+                <ul className="space-y-3 mb-6">
+                  {plan.features.map((feature, idx) => (
+                    <li key={idx} className="flex items-start gap-2">
+                      <Check className="w-5 h-5 flex-shrink-0 mt-0.5" style={{color: 'var(--color-success)'}} />
+                      <span className="text-sm">{feature}</span>
+                    </li>
+                  ))}
+                </ul>
+
+                {plan.name === 'free' ? (
+                  <button className="btn btn-outline w-full" disabled>
+                    Plan Actual
+                  </button>
+                ) : (
+                  <div className="space-y-3">
+                    <div ref={el => paypalRefs.current[plan.name] = el}></div>
+                    {paypalRefs.current[plan.name] && (
+                      <button 
+                        onClick={() => initPayPalButton(plan.name, plan.price)}
+                        className="btn btn-primary w-full"
+                      >
+                        <CreditCard className="w-4 h-4 mr-2 inline" />
+                        Inicializar PayPal
+                      </button>
+                    )}
+                    <button 
+                      onClick={() => handleBankTransfer(plan.name)}
+                      className="btn btn-secondary w-full"
+                    >
+                      <Building className="w-4 h-4 mr-2 inline" />
+                      Pagar por Transferencia
+                    </button>
+                  </div>
+                )}
               </div>
             ))}
           </div>
         )}
 
-        <div className="mt-12 text-center">
-          <p className="text-sm" style={{color: 'var(--color-text-secondary)'}}>
-            <Shield className="w-4 h-4 inline mr-1" />
-            Pagos seguros procesados por PayPal
-          </p>
-        </div>
+        {/* Modal de Transferencia Bancaria */}
+        {showBankTransfer && (
+          <div className="modal-overlay" onClick={() => setShowBankTransfer(false)}>
+            <div className="modal-content" onClick={(e) => e.stopPropagation()}>
+              <div className="flex justify-between items-center mb-4">
+                <h3 className="text-xl font-bold">Pago por Transferencia Bancaria</h3>
+                <button onClick={() => setShowBankTransfer(false)} className="p-2 hover:bg-gray-100 rounded">
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+
+              <div className="mb-6 p-4 rounded" style={{backgroundColor: 'var(--color-bg-main)'}}>
+                <h4 className="font-bold mb-3">Datos Bancarios - Banco Pichincha (Ecuador)</h4>
+                <div className="space-y-2 text-sm">
+                  <p><strong>Beneficiario:</strong> ElectroDesign Pro</p>
+                  <p><strong>RUC:</strong> 1234567890001</p>
+                  <p><strong>Banco:</strong> Banco Pichincha</p>
+                  <p><strong>Tipo de Cuenta:</strong> Corriente</p>
+                  <p><strong>Número de Cuenta:</strong> 2100123456</p>
+                  <p><strong>Plan seleccionado:</strong> {transferData.plan_id}</p>
+                  <p className="text-lg font-bold" style={{color: 'var(--color-primary)'}}>
+                    Monto a transferir: ${plans.find(p => p.name === transferData.plan_id)?.price || 0}
+                  </p>
+                </div>
+              </div>
+
+              <form onSubmit={submitBankTransfer}>
+                <div className="mb-4">
+                  <label className="block mb-2 font-medium">Número de Referencia/Transacción</label>
+                  <input
+                    type="text"
+                    className="input"
+                    value={transferData.reference}
+                    onChange={(e) => setTransferData({...transferData, reference: e.target.value})}
+                    placeholder="Ej: REF123456789"
+                    required
+                  />
+                </div>
+
+                <div className="mb-4">
+                  <label className="block mb-2 font-medium">Subir Comprobante de Pago</label>
+                  <input
+                    type="file"
+                    className="input"
+                    onChange={handleFileChange}
+                    accept="image/*,.pdf"
+                    required
+                  />
+                  <p className="text-xs mt-1" style={{color: 'var(--color-text-secondary)'}}>
+                    Formatos aceptados: JPG, PNG, PDF
+                  </p>
+                </div>
+
+                <div className="p-3 rounded mb-4" style={{backgroundColor: '#fef3c7'}}>
+                  <p className="text-xs" style={{color: '#92400e'}}>
+                    Tu licencia será activada manualmente en un plazo de 24-48 horas después de verificar el pago.
+                  </p>
+                </div>
+
+                <div className="flex justify-end gap-2">
+                  <button type="button" onClick={() => setShowBankTransfer(false)} className="btn btn-secondary">
+                    Cancelar
+                  </button>
+                  <button type="submit" className="btn btn-primary">
+                    <Upload className="w-4 h-4 mr-2 inline" />
+                    Enviar Comprobante
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );
