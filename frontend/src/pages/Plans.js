@@ -171,6 +171,8 @@ const Plans = () => {
 
         {loading ? (
           <div className="text-center">Cargando planes...</div>
+        ) : plans.length === 0 ? (
+          <div className="text-center">No hay planes disponibles</div>
         ) : (
           <div className="grid md:grid-cols-3 gap-8 mb-12">
             {plans.map(plan => (

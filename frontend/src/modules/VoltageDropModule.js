@@ -204,7 +204,7 @@ const VoltageDropModule = ({ projectId }) => {
       ((seg.drop_percent || 0) * 100).toFixed(3) + '%'
     ]);
     
-    doc.autoTable({
+    autoTable(doc, {
       startY: startY + 12,
       head: [[
         'Ref.',
@@ -237,7 +237,7 @@ const VoltageDropModule = ({ projectId }) => {
     });
     
     // Resultado final
-    const finalY = doc.lastAutoTable.finalY + 10;
+    const finalY = doc.previousAutoTable.finalY + 10;
     doc.setFontSize(11);
     doc.setFont(undefined, 'bold');
     doc.text(`CAÍDA TOTAL: ${(result.total_drop * 100).toFixed(3)}%`, 14, finalY);

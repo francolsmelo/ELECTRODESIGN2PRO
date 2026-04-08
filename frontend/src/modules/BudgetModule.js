@@ -194,7 +194,7 @@ const BudgetModule = ({ projectId }) => {
         '$' + ((item.quantity * item.unit_price)?.toFixed(2) || '0.00')
       ]);
       
-      doc.autoTable({
+      autoTable(doc, {
         startY: startY,
         head: [['Descripción', 'Cantidad', 'Unidad', 'P. Unitario', 'Subtotal']],
         body: materialsData,
@@ -210,7 +210,7 @@ const BudgetModule = ({ projectId }) => {
         }
       });
       
-      startY = doc.lastAutoTable.finalY + 3;
+      startY = doc.previousAutoTable.finalY + 3;
       const materialTotal = result.materials.reduce((sum, item) => sum + (item.quantity * item.unit_price), 0);
       doc.setFont(undefined, 'bold');
       doc.text(`Subtotal Materiales: $${materialTotal.toFixed(2)}`, 14, startY);
@@ -232,7 +232,7 @@ const BudgetModule = ({ projectId }) => {
         '$' + ((item.quantity * item.unit_price)?.toFixed(2) || '0.00')
       ]);
       
-      doc.autoTable({
+      autoTable(doc, {
         startY: startY,
         head: [['Descripción', 'Cantidad', 'Unidad', 'P. Unitario', 'Subtotal']],
         body: laborData,
@@ -248,7 +248,7 @@ const BudgetModule = ({ projectId }) => {
         }
       });
       
-      startY = doc.lastAutoTable.finalY + 3;
+      startY = doc.previousAutoTable.finalY + 3;
       const laborTotal = result.labor.reduce((sum, item) => sum + (item.quantity * item.unit_price), 0);
       doc.setFont(undefined, 'bold');
       doc.text(`Subtotal Mano de Obra: $${laborTotal.toFixed(2)}`, 14, startY);
@@ -270,7 +270,7 @@ const BudgetModule = ({ projectId }) => {
         '$' + ((item.quantity * item.unit_price)?.toFixed(2) || '0.00')
       ]);
       
-      doc.autoTable({
+      autoTable(doc, {
         startY: startY,
         head: [['Descripción', 'Cantidad', 'Unidad', 'P. Unitario', 'Subtotal']],
         body: dismantlingData,
@@ -286,7 +286,7 @@ const BudgetModule = ({ projectId }) => {
         }
       });
       
-      startY = doc.lastAutoTable.finalY + 3;
+      startY = doc.previousAutoTable.finalY + 3;
       const dismantlingTotal = result.dismantling.reduce((sum, item) => sum + (item.quantity * item.unit_price), 0);
       doc.setFont(undefined, 'bold');
       doc.text(`Subtotal Desmantelamiento: $${dismantlingTotal.toFixed(2)}`, 14, startY);
@@ -310,7 +310,7 @@ const BudgetModule = ({ projectId }) => {
       ['TOTAL', `$${result.total?.toFixed(2) || '0.00'}`]
     ];
     
-    doc.autoTable({
+    autoTable(doc, {
       startY: startY,
       body: summaryData,
       theme: 'grid',

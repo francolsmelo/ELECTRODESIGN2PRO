@@ -229,7 +229,7 @@ const ReportsModule = ({ projectId }) => {
       ['Tipo de Red:', factibilidadData.tipo_red || 'Aérea']
     ];
     
-    doc.autoTable({
+    autoTable(doc, {
       startY: startY,
       body: tableData,
       theme: 'plain',
@@ -240,7 +240,7 @@ const ReportsModule = ({ projectId }) => {
       }
     });
     
-    startY = doc.lastAutoTable.finalY + 10;
+    startY = doc.previousAutoTable.finalY + 10;
     doc.setFont(undefined, 'normal');
     doc.text('Particular que comunico a ustedes para los fines pertinentes.', 14, startY);
     startY += 10;
@@ -311,7 +311,7 @@ const ReportsModule = ({ projectId }) => {
       ['E-mail:', fiscalizacionData.email_profesional || '']
     ];
     
-    doc.autoTable({
+    autoTable(doc, {
       startY: startY,
       body: datosProf,
       theme: 'plain',
@@ -322,7 +322,7 @@ const ReportsModule = ({ projectId }) => {
       }
     });
     
-    startY = doc.lastAutoTable.finalY + 10;
+    startY = doc.previousAutoTable.finalY + 10;
     doc.text('Particular que comunico a usted para los fines correspondientes.', 14, startY);
     startY += 10;
     doc.text('Atentamente,', 14, startY);

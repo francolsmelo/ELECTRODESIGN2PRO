@@ -497,17 +497,15 @@ async def calculate_demand(data: Dict[str, Any], current_user: User = Depends(ge
 @api_router.post("/voltage-drop/calculate")
 async def calculate_voltage_drop(data: Dict[str, Any], current_user: User = Depends(get_current_user)):
     """
-    Calcula la caída de voltaje con el método mejorado incluyendo FFsu y número de conductores
-    FFsu = Factor de Frecuencia de Uso de la Carga (0.1 a 0.9 p.u)
+    Calcula la caída de voltaje EXACTAMENTE como el Excel
+    Fórmula: kVA·m / FCV_cable = % caída (sin multiplicar por 100)
     """
     segments = data.get("segments", [])
     circuit_type = data.get("circuit_type", "BT")
     limit = data.get("limit", 3.0)
     
-    # Procesar cada tramo desde el extremo hacia la fuente
-    for i in range(len(segments) - 1, -1, -1):
-        seg = segments[i]
-        
+    # Procesar cada tramo INDIVIDUALMENTE (sin acumulación)
+    for seg in segments:
         # Determinar kVA real del tramo
         kva_input = seg.get("kva", 0)
         kva_per_client = seg.get("kva_per_client", False)
@@ -525,54 +523,41 @@ async def calculate_voltage_drop(data: Dict[str, Any], current_user: User = Depe
         
         seg["kva_real"] = kva_real
         
-        # Acumular kVA desde el extremo
-        accumulated_kva = sum(s.get("kva_real", 0) for s in segments[i:])
-        seg["accumulated_kva"] = accumulated_kva
-        
-        # Calcular kVA·m o kVA·km
+        # Calcular kVA·m directamente SIN acumulación
         length = seg.get("length", 0)
         if circuit_type == "BT":
-            seg["kva_m"] = accumulated_kva * length
+            seg["kva_m"] = kva_real * length
         else:  # MT
-            seg["kva_km"] = accumulated_kva * (length / 1000)
+            seg["kva_km"] = kva_real * (length / 1000)
         
-        # Obtener FCV del conductor seleccionado desde la base de datos
+        # Obtener FCV del conductor
         conductor_id = seg.get("conductor_id")
-        fcv_conductor = 1.0  # Valor por defecto
+        fcv_conductor = 1.0
         
         if conductor_id:
             conductor = await db.conductors.find_one({"id": conductor_id}, {"_id": 0})
             if conductor:
                 fcv_conductor = conductor.get("fcv_kva_m", 1.0)
         
-        # FFsu - Factor de Frecuencia de Uso de la Carga (por defecto 0.7 si no se especifica)
-        ffsu = seg.get("ffsu", 0.7)
-        if not (0.1 <= ffsu <= 0.9):
-            ffsu = 0.7  # Validar rango
+        # FFsu por defecto 1.0 si no se especifica
+        ffsu = seg.get("ffsu", 1.0)
         
-        # Número de conductores por fase (reduce la caída de voltaje)
+        # Número de conductores
         num_conductors = seg.get("num_conductors", 1)
         if num_conductors < 1:
             num_conductors = 1
         
-        # Calcular FCV del tramo (NO es necesario multiplicar por FFsu aquí)
-        if circuit_type == "BT":
-            fcv_tramo = seg["kva_m"]
-        else:  # MT
-            fcv_tramo = seg["kva_km"]
-        
-        seg["fcv_tramo"] = fcv_tramo
         seg["ffsu"] = ffsu
         seg["num_conductors"] = num_conductors
         
-        # Calcular % de caída por tramo
-        # Fórmula correcta: (kVA·m × FFsu) / (FCV_conductor × num_conductors)
-        # NO multiplicar por 100, dejar valor exacto
+        # FÓRMULA SIMPLE DEL EXCEL:
+        # % caída = (kVA·m × FFsu) / (FCV_conductor × num_conductors)
+        # SIN multiplicar por 100
         if fcv_conductor > 0 and num_conductors > 0:
-            # El número de conductores multiplica el FCV efectivo (divisor más grande = menos caída)
-            effective_fcv = fcv_conductor * num_conductors
-            # FFsu se multiplica al numerador (frecuencia de uso afecta la carga)
-            seg["drop_percent"] = (fcv_tramo * ffsu) / effective_fcv
+            if circuit_type == "BT":
+                seg["drop_percent"] = (seg["kva_m"] * ffsu) / (fcv_conductor * num_conductors)
+            else:
+                seg["drop_percent"] = (seg["kva_km"] * ffsu) / (fcv_conductor * num_conductors)
         else:
             seg["drop_percent"] = 0
     
