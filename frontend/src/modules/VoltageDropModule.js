@@ -17,10 +17,10 @@ const VoltageDropModule = ({ projectId }) => {
   const [limitBT, setLimitBT] = useState(3.0);
   const [limitMT, setLimitMT] = useState(5.0);
   const [segmentsBT, setSegmentsBT] = useState([
-    { id: 1, ref: '1', length: '', clients: '', kva: '', kva_per_client: false, conductor_id: '', num_conductors: 1, ffsu: 0.7 }
+    { id: 1, ref: '1', length: 0, clients: 0, kva: 0, kva_per_client: false, conductor_id: '', num_conductors: 1, ffsu: 0.7 }
   ]);
   const [segmentsMT, setSegmentsMT] = useState([
-    { id: 1, ref: '1', length: '', transformers: '', kva: '', kva_per_client: false, conductor_id: '', num_conductors: 1, ffsu: 0.7 }
+    { id: 1, ref: '1', length: 0, transformers: 0, kva: 0, kva_per_client: false, conductor_id: '', num_conductors: 1, ffsu: 0.7 }
   ]);
   const [resultBT, setResultBT] = useState(null);
   const [resultMT, setResultMT] = useState(null);
@@ -80,9 +80,9 @@ const VoltageDropModule = ({ projectId }) => {
       setSegmentsBT([...segmentsBT, {
         id: Date.now(),
         ref: `${segmentsBT.length + 1}`,
-        length: '',
-        clients: '',
-        kva: '',
+        length: 0,
+        clients: 0,
+        kva: 0,
         kva_per_client: false,
         conductor_id: '',
         num_conductors: 1,
@@ -92,9 +92,9 @@ const VoltageDropModule = ({ projectId }) => {
       setSegmentsMT([...segmentsMT, {
         id: Date.now(),
         ref: `${segmentsMT.length + 1}`,
-        length: '',
-        transformers: '',
-        kva: '',
+        length: 0,
+        transformers: 0,
+        kva: 0,
         kva_per_client: false,
         conductor_id: '',
         num_conductors: 1,
