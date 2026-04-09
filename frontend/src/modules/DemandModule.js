@@ -5,6 +5,12 @@ import { Plus, Trash2, Calculator, Save, Download, FileText } from 'lucide-react
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 
+// Helper function to safely format numbers
+const safeToFixed = (value, decimals = 2) => {
+  const num = parseFloat(value);
+  return isNaN(num) || !isFinite(num) ? '0.00' : num.toFixed(decimals);
+};
+
 const DemandModule = ({ projectId }) => {
   const [lightingLoads, setLightingLoads] = useState([
     { id: 1, description: 'Puntos de alumbrado incandescentes', quantity: 0, unit_power: 100 }
@@ -153,7 +159,7 @@ const DemandModule = ({ projectId }) => {
         load.description,
         load.quantity,
         load.unit_power + ' W',
-        (load.quantity * load.unit_power).toFixed(2) + ' W'
+        safeToFixed(load.quantity * load.unit_power, 2) + ' W'
       ]);
       
       autoTable(doc, {
@@ -174,7 +180,7 @@ const DemandModule = ({ projectId }) => {
       
       startY = doc.lastAutoTable.finalY + 3;
       doc.setFont(undefined, 'bold');
-      doc.text(`Subtotal Alumbrado: ${result.total_lighting_kw.toFixed(2)} kW`, 14, startY);
+      doc.text(`Subtotal Alumbrado: ${safeToFixed(result.total_lighting_kw, 2)} kW`, 14, startY);
       startY += 10;
     }
     
@@ -190,7 +196,7 @@ const DemandModule = ({ projectId }) => {
         load.description,
         load.quantity,
         load.unit_power + ' W',
-        (load.quantity * load.unit_power).toFixed(2) + ' W'
+        safeToFixed(load.quantity * load.unit_power, 2) + ' W'
       ]);
       
       autoTable(doc, {
@@ -211,7 +217,7 @@ const DemandModule = ({ projectId }) => {
       
       startY = doc.lastAutoTable.finalY + 3;
       doc.setFont(undefined, 'bold');
-      doc.text(`Subtotal Cargas Especiales: ${result.total_special_kw.toFixed(2)} kW`, 14, startY);
+      doc.text(`Subtotal Cargas Especiales: ${safeToFixed(result.total_special_kw, 2)} kW`, 14, startY);
       startY += 10;
     }
     
@@ -225,11 +231,11 @@ const DemandModule = ({ projectId }) => {
     doc.setFontSize(11);
     
     const summaryData = [
-      ['Potencia Total Instalada', `${result.total_installed_kw.toFixed(2)} kW`],
-      ['Factor de Demanda', `${(result.demand_factor * 100).toFixed(0)}%`],
-      ['Factor de Potencia', `${(result.power_factor * 100).toFixed(0)}%`],
-      ['Demanda Calculada', `${result.demanded_kva.toFixed(2)} kVA`],
-      ['Transformador Recomendado', `${result.transformer_size_kva} kVA`]
+      ['Potencia Total Instalada', `${safeToFixed(result.total_installed_kw, 2)} kW`],
+      ['Factor de Demanda', `${safeToFixed(result.demand_factor * 100, 0)}%`],
+      ['Factor de Potencia', `${safeToFixed(result.power_factor * 100, 0)}%`],
+      ['Demanda Calculada', `${safeToFixed(result.demanded_kva, 2)} kVA`],
+      ['Transformador Recomendado', `${result.transformer_size_kva || 0} kVA`]
     ];
     
     autoTable(doc, {
@@ -478,17 +484,17 @@ const DemandModule = ({ projectId }) => {
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <div className="p-4 rounded border" style={{borderColor: 'var(--color-border)'}}>
               <p className="text-sm mb-1" style={{color: 'var(--color-text-secondary)'}}>Carga Total Instalada</p>
-              <p className="text-2xl font-bold mono" style={{color: 'var(--color-primary)'}}>{result.total_installed.toFixed(2)} W</p>
+              <p className="text-2xl font-bold mono" style={{color: 'var(--color-primary)'}}>{safeToFixed(result.total_installed, 2)} W</p>
             </div>
             
             <div className="p-4 rounded border" style={{borderColor: 'var(--color-border)'}}>
               <p className="text-sm mb-1" style={{color: 'var(--color-text-secondary)'}}>Demanda Total (kW)</p>
-              <p className="text-2xl font-bold mono" style={{color: 'var(--color-primary)'}}>{result.demand_kw.toFixed(2)} kW</p>
+              <p className="text-2xl font-bold mono" style={{color: 'var(--color-primary)'}}>{safeToFixed(result.demand_kw, 2)} kW</p>
             </div>
             
             <div className="p-4 rounded border" style={{borderColor: 'var(--color-border)'}}>
               <p className="text-sm mb-1" style={{color: 'var(--color-text-secondary)'}}>Demanda Total (kVA)</p>
-              <p className="text-2xl font-bold mono" style={{color: 'var(--color-secondary)'}}>{result.demand_kva.toFixed(2)} kVA</p>
+              <p className="text-2xl font-bold mono" style={{color: 'var(--color-secondary)'}}>{safeToFixed(result.demand_kva, 2)} kVA</p>
             </div>
             
             <div className="p-4 rounded border" style={{borderColor: 'var(--color-border)', backgroundColor: '#DBEAFE'}}>

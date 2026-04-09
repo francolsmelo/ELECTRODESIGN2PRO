@@ -22,10 +22,13 @@ const Plans = () => {
       const response = await fetch(`${API}/plans`);
       if (response.ok) {
         const data = await response.json();
-        setPlans(data);
+        setPlans(Array.isArray(data) ? data : []);
+      } else {
+        setPlans([]);
       }
     } catch (error) {
       toast.error('Error al cargar planes');
+      setPlans([]);
     }
     setLoading(false);
   };

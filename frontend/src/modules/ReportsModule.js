@@ -15,6 +15,7 @@ const ReportsModule = ({ projectId }) => {
     fecha_dia: '',
     fecha_mes: '',
     fecha_anio: '',
+    fecha_ciudad: '',
     ingeniero_nombre: '',
     tipo_servicio: 'diseño', // diseño o construcción
     nombre_proyecto: '',
@@ -22,6 +23,7 @@ const ReportsModule = ({ projectId }) => {
     ciudad: '',
     sector: '',
     provincia: '',
+    nombre_propietario: '',
     firma_propietario: ''
   });
 
@@ -144,7 +146,7 @@ const ReportsModule = ({ projectId }) => {
     // Cuerpo del documento
     let startY = 50;
     const text = [
-      `Yo, ${autorizacionData.firma_propietario || '[Nombre del Propietario]'}, en mi calidad de propietario,`,
+      `Yo, ${autorizacionData.nombre_propietario || '[Nombre del Propietario]'}, en mi calidad de propietario,`,
       `por medio de la presente autorizo al Ing. ${autorizacionData.ingeniero_nombre || '[Nombre del Ingeniero]'}`,
       `para que realice el ${autorizacionData.tipo_servicio || 'diseño'} del proyecto eléctrico denominado:`,
       '',
@@ -163,7 +165,7 @@ const ReportsModule = ({ projectId }) => {
       '',
       '',
       '_____________________________',
-      autorizacionData.firma_propietario || '[Nombre y Firma del Propietario]',
+      autorizacionData.nombre_propietario || '[Nombre y Firma del Propietario]',
       'Propietario'
     ];
     
@@ -420,6 +422,28 @@ const ReportsModule = ({ projectId }) => {
                   placeholder="2025"
                 />
               </div>
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium mb-2">Ciudad (para la fecha)</label>
+              <input
+                type="text"
+                className="input"
+                value={autorizacionData.fecha_ciudad}
+                onChange={(e) => setAutorizacionData({...autorizacionData, fecha_ciudad: e.target.value})}
+                placeholder="Quito"
+              />
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium mb-2">Nombre del Propietario *</label>
+              <input
+                type="text"
+                className="input"
+                value={autorizacionData.nombre_propietario}
+                onChange={(e) => setAutorizacionData({...autorizacionData, nombre_propietario: e.target.value})}
+                placeholder="Juan Carlos Ramírez González"
+              />
             </div>
 
             <div>

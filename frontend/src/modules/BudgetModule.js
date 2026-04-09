@@ -5,6 +5,12 @@ import { Plus, Trash2, DollarSign, FileText, Upload, Save, Download } from 'luci
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 
+// Helper function to safely format numbers
+const safeToFixed = (value, decimals = 2) => {
+  const num = parseFloat(value);
+  return isNaN(num) || !isFinite(num) ? '0.00' : num.toFixed(decimals);
+};
+
 const BudgetModule = ({ projectId }) => {
   const [materials, setMaterials] = useState([
     { id: 1, description: '', quantity: 0, unit: 'c/u', unit_price: 0 }
@@ -188,10 +194,10 @@ const BudgetModule = ({ projectId }) => {
       
       const materialsData = result.materials.map(item => [
         item.description,
-        item.quantity?.toFixed(2) || '0',
+        safeToFixed(item.quantity, 2),
         item.unit || 'c/u',
-        '$' + (item.unit_price?.toFixed(2) || '0.00'),
-        '$' + ((item.quantity * item.unit_price)?.toFixed(2) || '0.00')
+        '$' + safeToFixed(item.unit_price, 2),
+        '$' + safeToFixed(item.quantity * item.unit_price, 2)
       ]);
       
       autoTable(doc, {
@@ -226,10 +232,10 @@ const BudgetModule = ({ projectId }) => {
       
       const laborData = result.labor.map(item => [
         item.description,
-        item.quantity?.toFixed(2) || '0',
+        safeToFixed(item.quantity, 2),
         item.unit || 'U',
-        '$' + (item.unit_price?.toFixed(2) || '0.00'),
-        '$' + ((item.quantity * item.unit_price)?.toFixed(2) || '0.00')
+        '$' + safeToFixed(item.unit_price, 2),
+        '$' + safeToFixed(item.quantity * item.unit_price, 2)
       ]);
       
       autoTable(doc, {
@@ -264,10 +270,10 @@ const BudgetModule = ({ projectId }) => {
       
       const dismantlingData = result.dismantling.map(item => [
         item.description,
-        item.quantity?.toFixed(2) || '0',
+        safeToFixed(item.quantity, 2),
         item.unit || 'U',
-        '$' + (item.unit_price?.toFixed(2) || '0.00'),
-        '$' + ((item.quantity * item.unit_price)?.toFixed(2) || '0.00')
+        '$' + safeToFixed(item.unit_price, 2),
+        '$' + safeToFixed(item.quantity * item.unit_price, 2)
       ]);
       
       autoTable(doc, {
@@ -303,11 +309,11 @@ const BudgetModule = ({ projectId }) => {
     doc.setFontSize(11);
     
     const summaryData = [
-      ['Subtotal', `$${result.subtotal?.toFixed(2) || '0.00'}`],
-      [`Administración (${adminPercent}%)`, `$${result.administration?.toFixed(2) || '0.00'}`],
-      [`Utilidad (${utilityPercent}%)`, `$${result.utility?.toFixed(2) || '0.00'}`],
-      [`IVA (${ivaPercent}%)`, `$${result.iva?.toFixed(2) || '0.00'}`],
-      ['TOTAL', `$${result.total?.toFixed(2) || '0.00'}`]
+      ['Subtotal', `$${safeToFixed(result.subtotal, 2)}`],
+      [`Administración (${adminPercent}%)`, `$${safeToFixed(result.administration, 2)}`],
+      [`Utilidad (${utilityPercent}%)`, `$${safeToFixed(result.utility, 2)}`],
+      [`IVA (${ivaPercent}%)`, `$${safeToFixed(result.iva, 2)}`],
+      ['TOTAL', `$${safeToFixed(result.total, 2)}`]
     ];
     
     autoTable(doc, {
@@ -608,32 +614,32 @@ const BudgetModule = ({ projectId }) => {
           <div className="space-y-3 mb-6">
             <div className="flex justify-between p-3 rounded" style={{backgroundColor: 'var(--color-bg-main)'}}>
               <span className="font-medium">Subtotal Directo</span>
-              <span className="mono font-bold">${result.subtotal.toFixed(2)}</span>
+              <span className="mono font-bold">${safeToFixed(result.subtotal, 2)}</span>
             </div>
             
             <div className="flex justify-between p-3">
               <span>Administración ({adminPercent}%)</span>
-              <span className="mono">${result.administration.toFixed(2)}</span>
+              <span className="mono">${safeToFixed(result.administration, 2)}</span>
             </div>
             
             <div className="flex justify-between p-3">
               <span>Utilidad ({utilityPercent}%)</span>
-              <span className="mono">${result.utility.toFixed(2)}</span>
+              <span className="mono">${safeToFixed(result.utility, 2)}</span>
             </div>
             
             <div className="flex justify-between p-3 rounded" style={{backgroundColor: 'var(--color-bg-main)'}}>
               <span className="font-medium">Subtotal con Costos Indirectos</span>
-              <span className="mono font-bold">${(result.subtotal + result.administration + result.utility).toFixed(2)}</span>
+              <span className="mono font-bold">${safeToFixed(result.subtotal + result.administration + result.utility, 2)}</span>
             </div>
             
             <div className="flex justify-between p-3">
               <span>IVA ({ivaPercent}%)</span>
-              <span className="mono">${result.iva.toFixed(2)}</span>
+              <span className="mono">${safeToFixed(result.iva, 2)}</span>
             </div>
             
             <div className="flex justify-between p-4 rounded border-2" style={{borderColor: 'var(--color-secondary)', backgroundColor: '#DBEAFE'}}>
               <span className="font-bold text-lg">TOTAL PRESUPUESTO</span>
-              <span className="mono font-bold text-2xl" style={{color: 'var(--color-secondary)'}}>${result.total.toFixed(2)}</span>
+              <span className="mono font-bold text-2xl" style={{color: 'var(--color-secondary)'}}>${safeToFixed(result.total, 2)}</span>
             </div>
           </div>
 

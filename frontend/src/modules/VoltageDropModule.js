@@ -193,15 +193,15 @@ const VoltageDropModule = ({ projectId }) => {
     // Tabla de datos
     const tableData = result.segments.map(seg => [
       seg.ref,
-      seg.length?.toFixed(2) || '0',
+      safeToFixed(seg.length, 2),
       circuitType === 'BT' ? (seg.clients || 0) : (seg.transformers || 0),
-      seg.kva?.toFixed(2) || '0',
+      safeToFixed(seg.kva, 2),
       seg.num_conductors || 1,
-      seg.ffsu?.toFixed(2) || '0.70',
-      seg.accumulated_kva?.toFixed(2) || '0',
-      circuitType === 'BT' ? (seg.kva_m?.toFixed(2) || '0') : (seg.kva_km?.toFixed(2) || '0'),
-      seg.fcv_tramo?.toFixed(4) || '0',
-      ((seg.drop_percent || 0) * 100).toFixed(3) + '%'
+      safeToFixed(seg.ffsu, 2),
+      safeToFixed(seg.accumulated_kva, 2),
+      circuitType === 'BT' ? safeToFixed(seg.kva_m, 2) : safeToFixed(seg.kva_km, 2),
+      safeToFixed(seg.fcv_tramo, 4),
+      safeToFixed((seg.drop_percent || 0) * 100, 3) + '%'
     ]);
     
     autoTable(doc, {
@@ -212,7 +212,7 @@ const VoltageDropModule = ({ projectId }) => {
         circuitType === 'BT' ? 'Clientes' : 'Transf.',
         'kVA',
         'N° Cond.',
-        'FFsu',
+        'FCV',
         'kVA Acum.',
         circuitType === 'BT' ? 'kVA·m' : 'kVA·km',
         'FCV Tramo',
@@ -240,7 +240,7 @@ const VoltageDropModule = ({ projectId }) => {
     const finalY = doc.lastAutoTable.finalY + 10;
     doc.setFontSize(11);
     doc.setFont(undefined, 'bold');
-    doc.text(`CAÍDA TOTAL: ${(result.total_drop * 100).toFixed(3)}%`, 14, finalY);
+    doc.text(`CAÍDA TOTAL: ${safeToFixed(result.total_drop * 100, 3)}%`, 14, finalY);
     doc.text(`RESULTADO: ${result.compliant ? 'CUMPLE' : 'NO CUMPLE'}`, 14, finalY + 7);
     
     // Guardar PDF
@@ -261,11 +261,11 @@ const VoltageDropModule = ({ projectId }) => {
       [circuitType === 'BT' ? 'Clientes' : 'Transformadores']: circuitType === 'BT' ? seg.clients : seg.transformers,
       'kVA': seg.kva,
       'N° Conductores': seg.num_conductors,
-      'FFsu (p.u.)': seg.ffsu,
-      'kVA Acumulado': seg.accumulated_kva?.toFixed(2),
-      [circuitType === 'BT' ? 'kVA·m' : 'kVA·km']: circuitType === 'BT' ? seg.kva_m?.toFixed(2) : seg.kva_km?.toFixed(2),
-      'FCV Tramo': seg.fcv_tramo?.toFixed(4),
-      '% Caída': ((seg.drop_percent || 0) * 100).toFixed(3) + '%'
+      'FCV': seg.ffsu,
+      'kVA Acumulado': safeToFixed(seg.accumulated_kva, 2),
+      [circuitType === 'BT' ? 'kVA·m' : 'kVA·km']: circuitType === 'BT' ? safeToFixed(seg.kva_m, 2) : safeToFixed(seg.kva_km, 2),
+      'FCV Tramo': safeToFixed(seg.fcv_tramo, 4),
+      '% Caída': safeToFixed((seg.drop_percent || 0) * 100, 3) + '%'
     }));
     
     // Agregar fila de totales
@@ -279,7 +279,7 @@ const VoltageDropModule = ({ projectId }) => {
       'kVA Acumulado': '',
       [circuitType === 'BT' ? 'kVA·m' : 'kVA·km']: 'TOTAL',
       'FCV Tramo': '',
-      '% Caída': ((result.total_drop || 0) * 100).toFixed(3) + '%'
+      '% Caída': safeToFixed((result.total_drop || 0) * 100, 3) + '%'
     });
     
     const ws = XLSX.utils.json_to_sheet(data);
@@ -335,7 +335,7 @@ const VoltageDropModule = ({ projectId }) => {
                   <th>kVA x Cliente</th>
                   <th>Conductor</th>
                   <th>N° Cond.</th>
-                  <th>FFsu (p.u.)</th>
+                  <th>FCV</th>
                   <th></th>
                 </tr>
               </thead>
@@ -486,17 +486,17 @@ const VoltageDropModule = ({ projectId }) => {
                   {resultBT.segments.map((seg, idx) => (
                     <tr key={idx}>
                       <td className="mono">{seg.ref}</td>
-                      <td className="mono">{seg.accumulated_kva?.toFixed(2)}</td>
-                      <td className="mono">{seg.kva_m?.toFixed(2)}</td>
-                      <td className="mono">{seg.fcv_tramo?.toFixed(4)}</td>
-                      <td className="mono font-semibold">{(seg.drop_percent * 100)?.toFixed(3)}%</td>
+                      <td className="mono">{safeToFixed(seg.accumulated_kva, 2)}</td>
+                      <td className="mono">{safeToFixed(seg.kva_m, 2)}</td>
+                      <td className="mono">{safeToFixed(seg.fcv_tramo, 4)}</td>
+                      <td className="mono font-semibold">{safeToFixed(seg.drop_percent * 100, 3)}%</td>
                     </tr>
                   ))}
                 </tbody>
                 <tfoot>
                   <tr style={{backgroundColor: resultBT.compliant ? '#D1FAE5' : '#FEE2E2'}}>
                     <td colSpan="4" className="font-bold">Caída Total</td>
-                    <td className="mono font-bold">{(resultBT.total_drop * 100)?.toFixed(3)}%</td>
+                    <td className="mono font-bold">{safeToFixed(resultBT.total_drop * 100, 3)}%</td>
                   </tr>
                 </tfoot>
               </table>
@@ -513,7 +513,7 @@ const VoltageDropModule = ({ projectId }) => {
                   {resultBT.compliant ? '✓ Cumple con el límite' : '✗ No cumple con el límite'}
                 </p>
                 <p className="text-sm" style={{color: 'var(--color-text-secondary)'}}>
-                  Límite: {resultBT.limit}% | Caída: {(resultBT.total_drop * 100)?.toFixed(3)}%
+                  Límite: {resultBT.limit}% | Caída: {safeToFixed(resultBT.total_drop * 100, 3)}%
                 </p>
               </div>
             </div>
@@ -560,7 +560,7 @@ const VoltageDropModule = ({ projectId }) => {
                   <th>kVA x Transf</th>
                   <th>Conductor</th>
                   <th>N° Cond.</th>
-                  <th>FFsu (p.u.)</th>
+                  <th>FCV</th>
                   <th></th>
                 </tr>
               </thead>
@@ -643,7 +643,7 @@ const VoltageDropModule = ({ projectId }) => {
                         step="0.1"
                         min="0.1"
                         max="0.9"
-                        title="Factor de Frecuencia de Uso de la Carga (0.1 a 0.9)"
+                        title="Factor de Carga del Vano (0.1 a 0.9)"
                       />
                     </td>
                     <td>
@@ -711,17 +711,17 @@ const VoltageDropModule = ({ projectId }) => {
                   {resultMT.segments.map((seg, idx) => (
                     <tr key={idx}>
                       <td className="mono">{seg.ref}</td>
-                      <td className="mono">{seg.accumulated_kva?.toFixed(2)}</td>
-                      <td className="mono">{seg.kva_km?.toFixed(2)}</td>
-                      <td className="mono">{seg.fcv_tramo?.toFixed(4)}</td>
-                      <td className="mono font-semibold">{seg.drop_percent?.toFixed(3)}%</td>
+                      <td className="mono">{safeToFixed(seg.accumulated_kva, 2)}</td>
+                      <td className="mono">{safeToFixed(seg.kva_km, 2)}</td>
+                      <td className="mono">{safeToFixed(seg.fcv_tramo, 4)}</td>
+                      <td className="mono font-semibold">{safeToFixed(seg.drop_percent * 100, 3)}%</td>
                     </tr>
                   ))}
                 </tbody>
                 <tfoot>
                   <tr style={{backgroundColor: resultMT.compliant ? '#D1FAE5' : '#FEE2E2'}}>
                     <td colSpan="4" className="font-bold">Caída Total</td>
-                    <td className="mono font-bold">{(resultMT.total_drop * 100)?.toFixed(3)}%</td>
+                    <td className="mono font-bold">{safeToFixed(resultMT.total_drop * 100, 3)}%</td>
                   </tr>
                 </tfoot>
               </table>
@@ -738,7 +738,7 @@ const VoltageDropModule = ({ projectId }) => {
                   {resultMT.compliant ? '✓ Cumple con el límite' : '✗ No cumple con el límite'}
                 </p>
                 <p className="text-sm" style={{color: 'var(--color-text-secondary)'}}>
-                  Límite: {resultMT.limit}% | Caída: {(resultMT.total_drop * 100)?.toFixed(3)}%
+                  Límite: {resultMT.limit}% | Caída: {safeToFixed(resultMT.total_drop * 100, 3)}%
                 </p>
               </div>
             </div>
