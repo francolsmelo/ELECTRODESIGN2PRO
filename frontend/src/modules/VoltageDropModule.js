@@ -6,6 +6,12 @@ import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import * as XLSX from 'xlsx';
 
+// Helper function to safely format numbers
+const safeToFixed = (value, decimals = 2) => {
+  const num = parseFloat(value);
+  return isNaN(num) || !isFinite(num) ? '0.00' : num.toFixed(decimals);
+};
+
 const VoltageDropModule = ({ projectId }) => {
   const [conductors, setConductors] = useState([]);
   const [limitBT, setLimitBT] = useState(3.0);
@@ -201,7 +207,7 @@ const VoltageDropModule = ({ projectId }) => {
       safeToFixed(seg.accumulated_kva, 2),
       circuitType === 'BT' ? safeToFixed(seg.kva_m, 2) : safeToFixed(seg.kva_km, 2),
       safeToFixed(seg.fcv_tramo, 4),
-      safeToFixed((seg.drop_percent || 0) * 100, 3) + '%'
+      safeToFixed(seg.drop_percent || 0, 3) + '%'
     ]);
     
     autoTable(doc, {
@@ -240,7 +246,7 @@ const VoltageDropModule = ({ projectId }) => {
     const finalY = doc.lastAutoTable.finalY + 10;
     doc.setFontSize(11);
     doc.setFont(undefined, 'bold');
-    doc.text(`CAÍDA TOTAL: ${safeToFixed(result.total_drop * 100, 3)}%`, 14, finalY);
+    doc.text(`CAÍDA TOTAL: ${safeToFixed(result.total_drop, 3)}%`, 14, finalY);
     doc.text(`RESULTADO: ${result.compliant ? 'CUMPLE' : 'NO CUMPLE'}`, 14, finalY + 7);
     
     // Guardar PDF
@@ -265,7 +271,7 @@ const VoltageDropModule = ({ projectId }) => {
       'kVA Acumulado': safeToFixed(seg.accumulated_kva, 2),
       [circuitType === 'BT' ? 'kVA·m' : 'kVA·km']: circuitType === 'BT' ? safeToFixed(seg.kva_m, 2) : safeToFixed(seg.kva_km, 2),
       'FCV Tramo': safeToFixed(seg.fcv_tramo, 4),
-      '% Caída': safeToFixed((seg.drop_percent || 0) * 100, 3) + '%'
+      '% Caída': safeToFixed(seg.drop_percent || 0, 3) + '%'
     }));
     
     // Agregar fila de totales
@@ -279,7 +285,7 @@ const VoltageDropModule = ({ projectId }) => {
       'kVA Acumulado': '',
       [circuitType === 'BT' ? 'kVA·m' : 'kVA·km']: 'TOTAL',
       'FCV Tramo': '',
-      '% Caída': safeToFixed((result.total_drop || 0) * 100, 3) + '%'
+      '% Caída': safeToFixed(result.total_drop || 0, 3) + '%'
     });
     
     const ws = XLSX.utils.json_to_sheet(data);
@@ -489,14 +495,14 @@ const VoltageDropModule = ({ projectId }) => {
                       <td className="mono">{safeToFixed(seg.accumulated_kva, 2)}</td>
                       <td className="mono">{safeToFixed(seg.kva_m, 2)}</td>
                       <td className="mono">{safeToFixed(seg.fcv_tramo, 4)}</td>
-                      <td className="mono font-semibold">{safeToFixed(seg.drop_percent * 100, 3)}%</td>
+                      <td className="mono font-semibold">{safeToFixed(seg.drop_percent, 3)}%</td>
                     </tr>
                   ))}
                 </tbody>
                 <tfoot>
                   <tr style={{backgroundColor: resultBT.compliant ? '#D1FAE5' : '#FEE2E2'}}>
                     <td colSpan="4" className="font-bold">Caída Total</td>
-                    <td className="mono font-bold">{safeToFixed(resultBT.total_drop * 100, 3)}%</td>
+                    <td className="mono font-bold">{safeToFixed(resultBT.total_drop, 3)}%</td>
                   </tr>
                 </tfoot>
               </table>
@@ -513,7 +519,7 @@ const VoltageDropModule = ({ projectId }) => {
                   {resultBT.compliant ? '✓ Cumple con el límite' : '✗ No cumple con el límite'}
                 </p>
                 <p className="text-sm" style={{color: 'var(--color-text-secondary)'}}>
-                  Límite: {resultBT.limit}% | Caída: {safeToFixed(resultBT.total_drop * 100, 3)}%
+                  Límite: {resultBT.limit}% | Caída: {safeToFixed(resultBT.total_drop, 3)}%
                 </p>
               </div>
             </div>
@@ -714,14 +720,14 @@ const VoltageDropModule = ({ projectId }) => {
                       <td className="mono">{safeToFixed(seg.accumulated_kva, 2)}</td>
                       <td className="mono">{safeToFixed(seg.kva_km, 2)}</td>
                       <td className="mono">{safeToFixed(seg.fcv_tramo, 4)}</td>
-                      <td className="mono font-semibold">{safeToFixed(seg.drop_percent * 100, 3)}%</td>
+                      <td className="mono font-semibold">{safeToFixed(seg.drop_percent, 3)}%</td>
                     </tr>
                   ))}
                 </tbody>
                 <tfoot>
                   <tr style={{backgroundColor: resultMT.compliant ? '#D1FAE5' : '#FEE2E2'}}>
                     <td colSpan="4" className="font-bold">Caída Total</td>
-                    <td className="mono font-bold">{safeToFixed(resultMT.total_drop * 100, 3)}%</td>
+                    <td className="mono font-bold">{safeToFixed(resultMT.total_drop, 3)}%</td>
                   </tr>
                 </tfoot>
               </table>
@@ -738,7 +744,7 @@ const VoltageDropModule = ({ projectId }) => {
                   {resultMT.compliant ? '✓ Cumple con el límite' : '✗ No cumple con el límite'}
                 </p>
                 <p className="text-sm" style={{color: 'var(--color-text-secondary)'}}>
-                  Límite: {resultMT.limit}% | Caída: {safeToFixed(resultMT.total_drop * 100, 3)}%
+                  Límite: {resultMT.limit}% | Caída: {safeToFixed(resultMT.total_drop, 3)}%
                 </p>
               </div>
             </div>

@@ -204,12 +204,18 @@ const Plans = () => {
                 </div>
 
                 <ul className="space-y-3 mb-6">
-                  {plan.features.map((feature, idx) => (
+                  {(plan.features || []).map((feature, idx) => (
                     <li key={idx} className="flex items-start gap-2">
                       <Check className="w-5 h-5 flex-shrink-0 mt-0.5" style={{color: 'var(--color-success)'}} />
                       <span className="text-sm">{feature}</span>
                     </li>
                   ))}
+                  {(!plan.features || plan.features.length === 0) && (
+                    <li className="flex items-start gap-2">
+                      <Check className="w-5 h-5 flex-shrink-0 mt-0.5" style={{color: 'var(--color-success)'}} />
+                      <span className="text-sm">{plan.description}</span>
+                    </li>
+                  )}
                 </ul>
 
                 {plan.name === 'free' ? (
