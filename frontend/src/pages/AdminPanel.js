@@ -400,25 +400,146 @@ const AdminPanel = () => {
                   </h2>
                   <div className="space-y-6">
                     <div className="card">
-                      <h3 className="font-bold mb-4">PayPal</h3>
-                      <p className="text-sm mb-2" style={{color: 'var(--color-success)'}}>✓ Configurado y activo</p>
-                      <p className="text-xs" style={{color: 'var(--color-text-secondary)'}}>Modo: Sandbox</p>
+                      <h3 className="font-bold mb-4 text-lg">PayPal</h3>
+                      <p className="text-sm mb-4" style={{color: 'var(--color-success)'}}>✓ Integración PayPal activa</p>
+                      
+                      <div className="space-y-4 mb-4">
+                        <div>
+                          <label className="block text-sm font-medium mb-2">Client ID de PayPal</label>
+                          <input
+                            type="text"
+                            className="input"
+                            placeholder="AQ-xxxxxxxxxxxxx..."
+                            defaultValue="AQ-RuwhyLyVS6rGhb_yoJA5NVvBIknNEES6tGLuaJRYI8Oqltehtt8cEo41rL6WRWziuRpfUo2ARRo4R"
+                            readOnly
+                          />
+                          <p className="text-xs mt-1" style={{color: 'var(--color-text-secondary)'}}>
+                            Este es el Client ID público de tu app PayPal
+                          </p>
+                        </div>
+                        
+                        <div>
+                          <label className="block text-sm font-medium mb-2">Secret Key de PayPal *</label>
+                          <input
+                            type="password"
+                            className="input"
+                            placeholder="Ingresa tu PayPal Secret Key aquí"
+                          />
+                          <p className="text-xs mt-1" style={{color: 'var(--color-text-secondary)'}}>
+                            Obtén esta clave desde tu Dashboard de PayPal → Apps & Credentials
+                          </p>
+                        </div>
+                        
+                        <div>
+                          <label className="block text-sm font-medium mb-2">Modo de Operación</label>
+                          <select className="input">
+                            <option value="sandbox">Sandbox (Pruebas)</option>
+                            <option value="live">Live (Producción)</option>
+                          </select>
+                        </div>
+                        
+                        <button className="btn btn-primary">
+                          Guardar Configuración PayPal
+                        </button>
+                      </div>
                     </div>
                     
                     <div className="card">
-                      <h3 className="font-bold mb-4">Banco Pichincha (Ecuador)</h3>
-                      <p className="text-sm mb-2" style={{color: 'var(--color-success)'}}>✓ Configurado y activo</p>
-                      <div className="space-y-3 mb-4">
-                        <div className="p-3 rounded" style={{backgroundColor: 'var(--color-bg-main)'}}>
-                          <p className="text-sm"><strong>Beneficiario:</strong> Franklin Roberto Melo López</p>
-                          <p className="text-sm"><strong>RUC:</strong> 1234567890001</p>
-                          <p className="text-sm"><strong>Tipo de Cuenta:</strong> Transaccional</p>
-                          <p className="text-sm"><strong>Número de Cuenta:</strong> 4409606500</p>
+                      <h3 className="font-bold mb-4 text-lg">Banco Pichincha (Ecuador)</h3>
+                      <p className="text-sm mb-4" style={{color: 'var(--color-success)'}}>✓ Transferencia bancaria configurada</p>
+                      
+                      <div className="space-y-4 mb-4">
+                        <div>
+                          <label className="block text-sm font-medium mb-2">Beneficiario</label>
+                          <input
+                            type="text"
+                            className="input"
+                            placeholder="Nombre del beneficiario"
+                            defaultValue="Franklin Roberto Melo López"
+                          />
                         </div>
+                        
+                        <div className="grid grid-cols-2 gap-4">
+                          <div>
+                            <label className="block text-sm font-medium mb-2">RUC</label>
+                            <input
+                              type="text"
+                              className="input"
+                              placeholder="1234567890001"
+                              defaultValue="1234567890001"
+                            />
+                          </div>
+                          <div>
+                            <label className="block text-sm font-medium mb-2">Tipo de Cuenta</label>
+                            <select className="input">
+                              <option value="transaccional">Transaccional</option>
+                              <option value="ahorros">Ahorros</option>
+                              <option value="corriente">Corriente</option>
+                            </select>
+                          </div>
+                        </div>
+                        
+                        <div>
+                          <label className="block text-sm font-medium mb-2">Número de Cuenta</label>
+                          <input
+                            type="text"
+                            className="input"
+                            placeholder="4409606500"
+                            defaultValue="4409606500"
+                          />
+                        </div>
+                        
+                        <div>
+                          <label className="block text-sm font-medium mb-2">Client ID de Banco Pichincha (Opcional)</label>
+                          <input
+                            type="text"
+                            className="input"
+                            placeholder="Si tienes integración API del banco, ingresa Client ID"
+                          />
+                          <p className="text-xs mt-1" style={{color: 'var(--color-text-secondary)'}}>
+                            Proporcionado por el equipo de cómputo/informática del Banco Pichincha
+                          </p>
+                        </div>
+                        
+                        <div>
+                          <label className="block text-sm font-medium mb-2">API Secret de Banco Pichincha (Opcional)</label>
+                          <input
+                            type="password"
+                            className="input"
+                            placeholder="Si tienes integración API del banco, ingresa Secret"
+                          />
+                          <p className="text-xs mt-1" style={{color: 'var(--color-text-secondary)'}}>
+                            Clave secreta proporcionada por el banco para integraciones
+                          </p>
+                        </div>
+                        
+                        <div>
+                          <label className="flex items-center gap-2">
+                            <input type="checkbox" defaultChecked />
+                            <span className="text-sm">Activar transferencia bancaria manual</span>
+                          </label>
+                        </div>
+                        
+                        <button className="btn btn-primary">
+                          Guardar Configuración Banco Pichincha
+                        </button>
                       </div>
-                      <p className="text-xs" style={{color: 'var(--color-text-secondary)'}}>
-                        Los pagos por transferencia requieren activación manual de la licencia
-                      </p>
+                      
+                      <div className="p-3 rounded" style={{backgroundColor: '#fef3c7'}}>
+                        <p className="text-xs" style={{color: '#92400e'}}>
+                          <strong>Nota:</strong> Los pagos por transferencia requieren activación manual de licencias por parte del administrador.
+                        </p>
+                      </div>
+                    </div>
+                    
+                    <div className="card">
+                      <h3 className="font-bold mb-4 text-lg">Control de Planes</h3>
+                      <div>
+                        <label className="flex items-center gap-2">
+                          <input type="checkbox" defaultChecked />
+                          <span className="text-sm">Habilitar venta de planes (Deshabilitar para modo mantenimiento)</span>
+                        </label>
+                      </div>
                     </div>
                   </div>
                 </div>
