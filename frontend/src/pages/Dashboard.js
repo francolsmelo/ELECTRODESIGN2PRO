@@ -98,6 +98,7 @@ const Dashboard = () => {
         method: 'DELETE',
         headers: {
           'Authorization': `Bearer ${token}`
+          // No incluir Content-Type - el navegador lo establece automáticamente con boundary para FormData
         },
         body: formData
       });
@@ -113,7 +114,8 @@ const Dashboard = () => {
         toast.error(data.detail || 'Error al eliminar proyecto');
       }
     } catch (error) {
-      toast.error('Error de conexión');
+      console.error('Error al eliminar proyecto:', error);
+      toast.error('Error al eliminar proyecto. Verifica tu conexión.');
     }
     setDeletingProject(false);
   };
