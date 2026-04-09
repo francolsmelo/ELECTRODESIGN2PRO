@@ -56,9 +56,6 @@ function App() {
           <Route path="/" element={<Navigate to={user ? "/dashboard" : "/login"} />} />
         </Routes>
         <Toaster position="top-right" />
-        <footer style={{textAlign: 'center', padding: '1rem', fontSize: '0.875rem', color: '#6b7280', borderTop: '1px solid #e5e7eb', marginTop: '2rem'}}>
-          Designed by <strong>Robert Mel</strong> © {new Date().getFullYear()}
-        </footer>
       </BrowserRouter>
     </AuthContext.Provider>
   );
