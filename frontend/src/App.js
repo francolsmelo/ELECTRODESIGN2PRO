@@ -49,7 +49,7 @@ function App() {
         <Routes>
           <Route path="/login" element={!user ? <Login /> : <Navigate to="/dashboard" />} />
           <Route path="/register" element={!user ? <Register /> : <Navigate to="/dashboard" />} />
-          <Route path="/dashboard" element={user ? <Dashboard /> : <Navigate to="/dashboard" />} />
+          <Route path="/dashboard" element={user ? <Dashboard /> : <Navigate to="/login" />} />
           <Route path="/project/:projectId" element={user ? <ProjectView /> : <Navigate to="/login" />} />
           <Route path="/plans" element={user ? <Plans /> : <Navigate to="/login" />} />
           <Route path="/admin" element={user?.role === 'admin' ? <AdminPanel /> : <Navigate to="/dashboard" />} />

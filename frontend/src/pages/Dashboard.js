@@ -60,9 +60,18 @@ const Dashboard = () => {
   };
 
   const handleLogout = () => {
+    // Limpiar todo el localStorage
     localStorage.removeItem('token');
+    localStorage.removeItem('user');
+    
+    // Limpiar el estado del usuario
     setUser(null);
-    navigate('/login');
+    
+    // Navegar al login y forzar recarga
+    navigate('/login', { replace: true });
+    
+    // Forzar recarga completa para limpiar cualquier estado residual
+    window.location.href = '/login';
   };
 
   const handleDeleteClick = (e, project) => {

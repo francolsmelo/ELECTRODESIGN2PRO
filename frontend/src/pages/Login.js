@@ -1,4 +1,4 @@
-import React, { useState, useContext } from 'react';
+import React, { useState, useContext, useEffect } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { AuthContext, API } from '../App';
 import { toast } from 'sonner';
@@ -10,6 +10,14 @@ const Login = () => {
   const [loading, setLoading] = useState(false);
   const { setUser } = useContext(AuthContext);
   const navigate = useNavigate();
+
+  // Limpiar estado al cargar el componente de login
+  useEffect(() => {
+    // Limpiar campos
+    setEmail('');
+    setPassword('');
+    setLoading(false);
+  }, []);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -26,7 +34,7 @@ const Login = () => {
       const data = await response.json();
 
       if (!response.ok) {
-        toast.error(data.detail || 'Error al iniciar sesión');
+        toast.error(data.detail || 'Credenciales inválidas');
         setLoading(false);
         return;
       }
@@ -40,14 +48,12 @@ const Login = () => {
       
       toast.success('Sesión iniciada correctamente');
       
-      // Forzar navegación
-      setTimeout(() => {
-        navigate('/dashboard', { replace: true });
-        window.location.reload();
-      }, 100);
+      // Navegar al dashboard
+      navigate('/dashboard', { replace: true });
+      
     } catch (error) {
       console.error('Login error:', error);
-      toast.error('Error de conexión');
+      toast.error('Error de conexión al servidor');
       setLoading(false);
     }
   };
