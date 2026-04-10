@@ -1,0 +1,41 @@
+services:
+  # ── Backend (FastAPI) ──────────────────────────────────────────────────────
+  - type: web
+    name: electrodesign-backend
+    runtime: python
+    rootDir: backend
+    buildCommand: pip install -r requirements.txt
+    startCommand: uvicorn server:app --host 0.0.0.0 --port $PORT
+    envVars:
+      - key: MONGO_URL
+        sync: false          # set manually in Render dashboard
+      - key: DB_NAME
+        sync: false
+      - key: JWT_SECRET
+        sync: false
+      - key: EMERGENT_LLM_KEY
+        sync: false
+      - key: PAYPAL_CLIENT_ID
+        sync: false
+      - key: PAYPAL_SECRET
+        sync: false
+      - key: PAYPAL_MODE
+        value: sandbox       # change to "live" when going to production
+      - key: CORS_ORIGINS
+        sync: false          # set to your frontend URL, e.g. https://electrodesign-frontend.onrender.com
+    healthCheckPath: /api/health
+
+  # ── Frontend (React) ───────────────────────────────────────────────────────
+  - type: web
+    name: electrodesign-frontend
+    runtime: static
+    rootDir: frontend
+    buildCommand: yarn install && yarn build
+    staticPublishPath: build
+    envVars:
+      - key: REACT_APP_BACKEND_URL
+        sync: false          # set to your backend URL, e.g. https://electrodesign-backend.onrender.com
+    routes:
+      - type: rewrite
+        source: /*
+        destination: /index.html
