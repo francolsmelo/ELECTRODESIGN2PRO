@@ -1301,6 +1301,10 @@ async def bank_transfer_payment(
 async def health_check():
     return {"status": "ok"}
 
+@app.get("/")
+async def root():
+    return {"status": "ok", "message": "ElectroDesign2Pro API is running. Use /api/* endpoints."}
+
 app.include_router(api_router)
 
 app.add_middleware(
