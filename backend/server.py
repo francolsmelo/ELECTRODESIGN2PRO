@@ -1286,6 +1286,10 @@ async def bank_transfer_payment(
     }
 
 
+@api_router.get("/health")
+async def health_check():
+    return {"status": "ok"}
+
 app.include_router(api_router)
 
 app.add_middleware(
