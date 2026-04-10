@@ -13,7 +13,7 @@ from datetime import datetime, timezone, timedelta
 import jwt
 import bcrypt
 import base64
-from emergentintegrations.llm.chat import LlmChat, UserMessage, ImageContent
+from openai import AsyncOpenAI
 import secrets
 import hashlib
 
@@ -362,19 +362,30 @@ async def get_project(project_id: str, current_user: User = Depends(get_current_
 @api_router.post("/inspection/analyze")
 async def analyze_inspection(image_base64: str = Form(...), project_id: str = Form(...), current_user: User = Depends(get_current_user)):
     try:
-        chat = LlmChat(
-            api_key=EMERGENT_LLM_KEY,
-            session_id=f"inspection_{project_id}",
-            system_message="Eres un experto ingeniero eléctrico especializado en análisis de infraestructura eléctrica. Analiza imágenes e identifica: postes, redes de media tensión, transformadores, distancias estimadas, y cualquier elemento relevante para diseño eléctrico."
-        ).with_model("openai", "gpt-5.2")
-        
-        image_content = ImageContent(image_base64=image_base64)
-        message = UserMessage(
-            text="Analiza esta imagen de infraestructura eléctrica. Identifica: postes (tipo, material), redes MT existentes, posible ubicación de transformador, distancias estimadas, y recomendaciones técnicas para el diseño.",
-            file_contents=[image_content]
+        openai_client = AsyncOpenAI(api_key=EMERGENT_LLM_KEY)
+        completion = await openai_client.chat.completions.create(
+            model="gpt-4o",
+            messages=[
+                {
+                    "role": "system",
+                    "content": "Eres un experto ingeniero eléctrico especializado en análisis de infraestructura eléctrica. Analiza imágenes e identifica: postes, redes de media tensión, transformadores, distancias estimadas, y cualquier elemento relevante para diseño eléctrico."
+                },
+                {
+                    "role": "user",
+                    "content": [
+                        {
+                            "type": "text",
+                            "text": "Analiza esta imagen de infraestructura eléctrica. Identifica: postes (tipo, material), redes MT existentes, posible ubicación de transformador, distancias estimadas, y recomendaciones técnicas para el diseño."
+                        },
+                        {
+                            "type": "image_url",
+                            "image_url": {"url": f"data:image/jpeg;base64,{image_base64}"}
+                        }
+                    ]
+                }
+            ]
         )
-        
-        response = await chat.send_message(message)
+        response = completion.choices[0].message.content
         
         inspection = InspectionAnalysis(
             project_id=project_id,
