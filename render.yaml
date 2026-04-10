@@ -1,16 +1,18 @@
 services:
-  # ── Backend (FastAPI) ──────────────────────────────────────────────────────
+  # ── Full-stack service (FastAPI serves built React frontend) ───────────────
   - type: web
-    name: electrodesign-backend
+    name: electrodesign2pro
     runtime: python
-    rootDir: backend
-    buildCommand: pip install -r requirements.txt
-    startCommand: uvicorn server:app --host 0.0.0.0 --port $PORT
+    buildCommand: >
+      cd frontend && yarn install && yarn build && cd .. &&
+      cp -r frontend/build backend/static &&
+      pip install -r backend/requirements.txt
+    startCommand: cd backend && uvicorn server:app --host 0.0.0.0 --port $PORT
     envVars:
       - key: PYTHON_VERSION
         value: "3.11.9"
       - key: MONGO_URL
-        sync: false          # set manually in Render dashboard
+        sync: false
       - key: DB_NAME
         sync: false
       - key: JWT_SECRET
@@ -22,22 +24,5 @@ services:
       - key: PAYPAL_SECRET
         sync: false
       - key: PAYPAL_MODE
-        value: sandbox       # change to "live" when going to production
-      - key: CORS_ORIGINS
-        sync: false          # set to your frontend URL, e.g. https://electrodesign-frontend.onrender.com
+        value: sandbox
     healthCheckPath: /api/health
-
-  # ── Frontend (React) ───────────────────────────────────────────────────────
-  - type: web
-    name: electrodesign-frontend
-    runtime: static
-    rootDir: frontend
-    buildCommand: yarn install && yarn build
-    staticPublishPath: build
-    envVars:
-      - key: REACT_APP_BACKEND_URL
-        sync: false          # set to your backend URL, e.g. https://electrodesign-backend.onrender.com
-    routes:
-      - type: rewrite
-        source: /*
-        destination: /index.html

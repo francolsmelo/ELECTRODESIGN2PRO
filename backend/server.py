@@ -1,5 +1,7 @@
 from fastapi import FastAPI, APIRouter, HTTPException, Depends, UploadFile, File, Form
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
+from fastapi.staticfiles import StaticFiles
+from fastapi.responses import FileResponse
 from dotenv import load_dotenv
 from starlette.middleware.cors import CORSMiddleware
 from motor.motor_asyncio import AsyncIOMotorClient
@@ -1301,10 +1303,6 @@ async def bank_transfer_payment(
 async def health_check():
     return {"status": "ok"}
 
-@app.get("/")
-async def root():
-    return {"status": "ok", "message": "ElectroDesign2Pro API is running. Use /api/* endpoints."}
-
 app.include_router(api_router)
 
 app.add_middleware(
@@ -1314,6 +1312,26 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# Serve React frontend static files if the build directory exists
+STATIC_DIR = ROOT_DIR / "static"
+INDEX_HTML = str(STATIC_DIR / "index.html")
+if STATIC_DIR.is_dir():
+    # Serve bundled JS/CSS/media from React build's /static subfolder
+    app.mount("/static", StaticFiles(directory=str(STATIC_DIR / "static")), name="assets")
+
+    @app.get("/")
+    async def serve_index():
+        return FileResponse(INDEX_HTML)
+
+    @app.get("/{full_path:path}")
+    async def serve_spa(full_path: str):  # noqa: ARG001
+        # SPA fallback: all non-API, non-static routes return index.html
+        return FileResponse(INDEX_HTML)
+else:
+    @app.get("/")
+    async def root():
+        return {"status": "ok", "message": "ElectroDesign2Pro API is running. Use /api/* endpoints."}
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
