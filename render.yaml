@@ -4,13 +4,15 @@ services:
     name: electrodesign2pro
     runtime: python
     buildCommand: >
-      cd frontend && yarn install && yarn build && cd .. &&
+      cd frontend && npm install && npm run build && cd .. &&
       cp -r frontend/build backend/static &&
       pip install -r backend/requirements.txt
     startCommand: cd backend && uvicorn server:app --host 0.0.0.0 --port $PORT
     envVars:
       - key: PYTHON_VERSION
         value: "3.11.9"
+      - key: NODE_VERSION
+        value: "20"
       - key: MONGO_URL
         sync: false
       - key: DB_NAME
