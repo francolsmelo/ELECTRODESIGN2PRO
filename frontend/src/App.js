@@ -10,8 +10,8 @@ import ProjectView from './pages/ProjectView';
 import Plans from './pages/Plans';
 import AdminPanel from './pages/AdminPanel';
 
-import { API_URL } from './config';
-export const API = `${API_URL}/api`;
+const BACKEND_URL = process.env.REACT_APP_BACKEND_URL;
+export const API = `${BACKEND_URL}/api`;
 
 export const AuthContext = React.createContext();
 
